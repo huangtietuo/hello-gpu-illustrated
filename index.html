@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hello GPU 图解教材 · 大白话看懂 GPU 算子优化(20章全集)</title>
+<meta name="description" content="《Hello GPU》的白话图解版:20 章内容重写成看得懂的可视化教材——GPU 硬件、可信计时、Roofline、逐元素/归约/Softmax/GEMM/融合算子、Agent 自动优化、LLM 解码实战。">
+<style>
+  :root{
+    --bg:#f5f6fa; --card:#ffffff; --ink:#232936; --ink2:#5a6474; --line:#e3e6ee;
+    --hip:#e8590c; --tri:#1971c2; --ok:#2f9e44; --bad:#e03131; --gold:#f59f00;
+    --code-bg:#1b1e27;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html{scroll-behavior:smooth;}
+  body{font-family:"PingFang SC","Microsoft YaHei","Segoe UI",system-ui,sans-serif; background:var(--bg); color:var(--ink); line-height:1.75; font-size:16px;}
+  .wrap{max-width:1060px; margin:0 auto; padding:0 20px 90px;}
+  .topbar{position:sticky; top:0; z-index:50; background:rgba(245,246,250,.92); backdrop-filter:blur(8px); border-bottom:1px solid var(--line);}
+  .topbar .in{max-width:1060px; margin:0 auto; padding:10px 20px; display:flex; gap:14px; align-items:center; flex-wrap:wrap;}
+  .logo{font-weight:800; color:var(--ink); text-decoration:none;}
+  .logo b{color:#ffd43b;}
+  .topbar nav{display:flex; gap:4px; flex-wrap:wrap;}
+  .topbar nav a{font-size:13px; color:var(--ink2); text-decoration:none; padding:4px 9px; border-radius:20px;}
+  .topbar nav a:hover{background:var(--ink); color:#fff;}
+  .hero{margin-top:34px; padding:52px 40px; border-radius:24px; color:#fff; background:linear-gradient(125deg,#12141f 0%,#1d2749 45%,#3b2a63 80%,#5b2a4d 100%); position:relative; overflow:hidden;}
+  .hero::after{content:""; position:absolute; right:-80px; top:-90px; width:320px; height:320px; border-radius:50%; background:radial-gradient(circle,rgba(255,212,59,.25),transparent 65%);}
+  .hero::before{content:""; position:absolute; left:-70px; bottom:-100px; width:300px; height:300px; border-radius:50%; background:radial-gradient(circle,rgba(116,143,252,.3),transparent 65%);}
+  .hero .kicker{font-size:13px; letter-spacing:2.5px; opacity:.7; margin-bottom:14px;}
+  .hero h1{font-size:clamp(28px,4.6vw,44px); line-height:1.28; margin-bottom:16px;}
+  .hero h1 em{font-style:normal; color:#ffd43b;}
+  .hero p.lead{max-width:800px; color:#c9d2e3; font-size:16px;}
+  .chips{margin-top:22px; display:flex; gap:10px; flex-wrap:wrap;}
+  .chip{font-size:12.5px; padding:5px 13px; border-radius:20px; background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.22);}
+  .hero .stats{margin-top:26px; display:flex; gap:28px; flex-wrap:wrap;}
+  .hero .st b{display:block; font-size:26px; color:#ffd43b;}
+  .hero .st span{font-size:12.5px; color:#aeb8cf;}
+  .hero .oneline{margin-top:26px; padding:14px 18px; border-left:4px solid #ffd43b; background:rgba(255,255,255,.07); border-radius:0 12px 12px 0; font-size:15px; color:#f1f3f8; max-width:820px;}
+  section{margin-top:52px;}
+  .sec-head{margin-bottom:18px;}
+  .sec-head h2{font-size:clamp(21px,3vw,27px);}
+  .sec-head p{color:var(--ink2); font-size:14.5px;}
+  .parts{display:grid; grid-template-columns:repeat(auto-fit,minmax(320px,1fr)); gap:18px;}
+  .part{display:block; text-decoration:none; background:var(--card); border:1px solid var(--line); border-radius:18px; padding:22px 24px; color:var(--ink); transition:transform .15s, box-shadow .15s; position:relative; overflow:hidden;}
+  .part:hover{transform:translateY(-4px); box-shadow:0 10px 26px rgba(35,41,54,.12);}
+  .part .pnum{position:absolute; right:14px; top:6px; font-size:64px; font-weight:900; opacity:.07;}
+  .part h3{font-size:18px; margin-bottom:4px;}
+  .part .range{font-size:12px; font-weight:800; letter-spacing:1px; margin-bottom:10px; display:inline-block; padding:2px 10px; border-radius:10px;}
+  .part p{font-size:13.5px; color:var(--ink2);}
+  .part .chapters{margin-top:12px; font-size:12.5px; color:var(--ink2); line-height:1.9;}
+  .part .go{margin-top:12px; font-weight:800; font-size:13.5px; display:inline-block;}
+  .p0{border-top:5px solid #0ca678;} .p0 .range{background:#e6fcf5; color:#087f5b;} .p0 .go{color:#087f5b;} .p0 .pnum{color:#0ca678;}
+  .p1{border-top:5px solid #f08c00;} .p1 .range{background:#fff4e6; color:#b23a00;} .p1 .go{color:#b23a00;} .p1 .pnum{color:#f08c00;}
+  .p2{border-top:5px solid #4263eb;} .p2 .range{background:#edf2ff; color:#364fc7;} .p2 .go{color:#364fc7;} .p2 .pnum{color:#4263eb;}
+  .p3{border-top:5px solid #d6336c;} .p3 .range{background:#fff0f6; color:#a61e4d;} .p3 .go{color:#a61e4d;} .p3 .pnum{color:#d6336c;}
+  .p4{border-top:5px solid #0c8599;} .p4 .range{background:#e3fafc; color:#095e68;} .p4 .go{color:#095e68;} .p4 .pnum{color:#0c8599;}
+  /* 全书章节地图 */
+  .map{display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:12px;}
+  .chp{background:var(--card); border:1px solid var(--line); border-radius:13px; padding:13px 15px; font-size:13px;}
+  .chp b{display:flex; gap:8px; align-items:baseline; font-size:13.5px;}
+  .chp b .no{flex:none; width:26px; height:26px; border-radius:8px; color:#fff; display:flex; align-items:center; justify-content:center; font-size:12.5px;}
+  .chp p{color:var(--ink2); font-size:12.5px; margin-top:6px; line-height:1.6;}
+  .chp a{text-decoration:none; color:inherit; display:block;}
+  .g0{background:#0ca678;} .g1{background:#f08c00;} .g2{background:#4263eb;} .g3{background:#d6336c;} .g4{background:#0c8599;}
+  .callout{border-radius:14px; padding:16px 20px; margin-top:18px; font-size:15px; border:1px solid;}
+  .callout .tt{font-weight:800; margin-bottom:6px;}
+  .callout.gold{background:#fff9db; border-color:#ffe08a;} .callout.gold .tt{color:#b8860b;}
+  .callout.plain{background:#f4f5f9; border-color:#e3e6ee;}
+  .callout.warn{background:#fff0f0; border-color:#ffc2c2;} .callout.warn .tt{color:var(--bad);}
+  .callout.ok{background:#ebfbee; border-color:#b2f2bb;} .callout.ok .tt{color:var(--ok);}
+  .grid2{display:grid; grid-template-columns:1fr 1fr; gap:18px;}
+  @media (max-width:820px){.grid2{grid-template-columns:1fr;}}
+  .loop{display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-top:8px;}
+  .loop .st{background:#fff; border:2px solid #ffd8a8; border-radius:10px; padding:8px 14px; font-size:13.5px; font-weight:700;}
+  .loop .ar{color:#8a93a6; font-weight:800;}
+  footer{margin-top:70px; padding-top:24px; border-top:1px solid var(--line); color:var(--ink2); font-size:13.5px;}
+  footer a{color:var(--tri);}
+</style>
+</head>
+<body>
+<div class="topbar"><div class="in">
+  <a class="logo" href="index.html">Hello·GPU <b>图解教材</b></a>
+  <nav>
+    <a href="part0.html">① 入门 0-4</a>
+    <a href="part1.html">② 量准 5-7</a>
+    <a href="part2.html">③ 算子 8-13</a>
+    <a href="part3.html">④ Agent 14-17</a>
+    <a href="part4.html">⑤ 实战 18-19</a>
+  </nav>
+</div></div>
+
+<div class="wrap">
+
+<header class="hero">
+  <div class="kicker">HELLO GPU · 大白话图解教材 · 全 20 章</div>
+  <h1>看懂 GPU 算子优化:<br>从<em>一道加法题</em>到<em>LLM 解码实战</em></h1>
+  <p class="lead">这是 datawhalechina《Hello GPU》的白话图解重制版:把原文的硬核内容,翻译成"看得懂的比喻 + 画出来的原理 + 敢记录的负结果"。不要求你会 CUDA,只要求你会一点 Python 和好奇心。</p>
+  <div class="chips">
+    <span class="chip">📗 20 章 · 5 大部分</span>
+    <span class="chip">🖥️ RX 9070 XT + ROCm 实测数据</span>
+    <span class="chip">🗣️ 每个概念配白话比喻</span>
+    <span class="chip">📉 负结果也是正式数据</span>
+    <span class="chip">🤖 Agent 自动优化闭环</span>
+  </div>
+  <div class="stats">
+    <div class="st"><b>20</b><span>章 · 全覆盖</span></div>
+    <div class="st"><b>5</b><span>大部分 · 递进路线</span></div>
+    <div class="st"><b>2-3 周</b><span>建议学习时长(每天2-3h)</span></div>
+    <div class="st"><b>2.19×</b><span>Agent 实战自动优化成绩</span></div>
+  </div>
+  <div class="oneline">💡 <b>全书一句话:</b>先把时间量准(profiling),再谈快慢(算子),再把这套闭环教给 AI(Agent)——测不准的时候,"优化"就是赌博。</div>
+</header>
+
+<section id="parts">
+  <div class="sec-head"><h2>📚 五大部分,选你的入口</h2><p>推荐顺序阅读;每部分都是独立的白话教材页面。</p></div>
+  <div class="parts">
+    <a class="part p0" href="part0.html">
+      <div class="pnum">0</div>
+      <span class="range">PART 0 · 第 0-4 章</span>
+      <h3>入门篇:认识 GPU,铺平动手路</h3>
+      <p>全书地图、环境三道门、硬件心智模型(grid/wavefront/EXEC 掩码、存储金字塔、合并访存、WMMA)、第一个 kernel 与第一次性能分析。</p>
+      <div class="chapters">第0章 写给读者的话 · 第1章 环境准备 · 第2-3章 GPU体系结构(上/下) · 第4章 第一个程序+性能分析</div>
+      <span class="go">开始阅读 →</span>
+    </a>
+    <a class="part p1" href="part1.html">
+      <div class="pnum">1</div>
+      <span class="range">PART 1 · 第 5-7 章</span>
+      <h3>Profiling 篇:把时间量准,把方向选对</h3>
+      <p>全书最重要也最容易被跳过的一篇:warmup/repeat/GPU event 可信计时,rocprofv3 定位慢点(6.7 倍悬案),Roofline 图选优化方向。</p>
+      <div class="chapters">第5章 benchmark 与可信计时 · 第6章 用 rocprof 找到慢在哪里 · 第7章 读懂 Roofline 图</div>
+      <span class="go">开始阅读 →</span>
+    </a>
+    <a class="part p2" href="part2.html">
+      <div class="pnum">2</div>
+      <span class="range">PART 2 · 第 8-13 章</span>
+      <h3>算子篇:亲手写算子(全书正餐)</h3>
+      <p>逐元素 → 归约 → Softmax → GEMM → 融合 Attention → RMSNorm 结业。HIP 与 Triton 双路线,每章带实测数据与负结果。第 8 章另有交互加强版。</p>
+      <div class="chapters">第8章 逐元素(交互版) · 第9章 归约 · 第10章 Softmax · 第11章 GEMM · 第12章 融合/在线Softmax · 第13章 RMSNorm 结业</div>
+      <span class="go">开始阅读 →</span>
+    </a>
+    <a class="part p3" href="part3.html">
+      <div class="pnum">3</div>
+      <span class="range">PART 3 · 第 14-17 章</span>
+      <h3>Agent 篇:让 AI 替你跑优化闭环</h3>
+      <p>Agent = LLM + 工具 + 循环。权威工具与自由工具、结构化体检报告单、六步主循环,实战 10 轮自动优化 vector_add:0.705→0.322 ms(2.19×)。</p>
+      <div class="chapters">第14章 Agent 入门 · 第15章 工具封装 · 第16章 优化 Agent 设计 · 第17章 多轮优化实战</div>
+      <span class="go">开始阅读 →</span>
+    </a>
+    <a class="part p4" href="part4.html">
+      <div class="pnum">4</div>
+      <span class="range">PART 4 · 第 18-19 章</span>
+      <h3>实战篇:真实模型上场</h3>
+      <p>YOLO 部署路线图(Alpha)、小模型 LLM decode 实测——"量化越低越快"在 RDNA3 上被推翻,精度×调度必须当组合实验看。</p>
+      <div class="chapters">第18章 YOLO 部署+Agent(Alpha) · 第19章 小模型 LLM 解码+Agent 自动优化</div>
+      <span class="go">开始阅读 →</span>
+    </a>
+  </div>
+</section>
+
+<section id="map">
+  <div class="sec-head"><h2>🗺️ 全书 20 章地图</h2><p>每章一句话;点标题直达对应部分页。</p></div>
+  <div class="map">
+    <div class="chp"><a href="part0.html"><b><span class="no g0">0</span>写给读者的话</b><p>全书主线:理解→测量→优化→刷题→自动化;先体检后开药。</p></a></div>
+    <div class="chp"><a href="part0.html"><b><span class="no g0">1</span>环境准备</b><p>三道门体检:ROCm 见卡、PyTorch 用卡、HIP 编译跑通。</p></a></div>
+    <div class="chp"><a href="part0.html"><b><span class="no g0">2</span>GPU 体系结构(上)</b><p>grid→workgroup→wavefront→lane;EXEC 掩码:分支发散是排队不是并行。</p></a></div>
+    <div class="chp"><a href="part0.html"><b><span class="no g0">3</span>GPU 体系结构(下)</b><p>六层存储金字塔、占用率由"最先耗尽的资源"决定;stride-257 带宽掉到 1/8。</p></a></div>
+    <div class="chp"><a href="part0.html"><b><span class="no g0">4</span>第一个程序+性能分析</b><p>vector add 跑通;AI≈0.083,带宽利用率 91%,GPU 比 CPU 快 21 倍的口径。</p></a></div>
+    <div class="chp"><a href="part1.html"><b><span class="no g1">5</span>benchmark 与可信计时</b><p>warmup/repeat/synchronize/GPU event;拆穿缓存伪提升与 fp16"翻倍"错觉。</p></a></div>
+    <div class="chp"><a href="part1.html"><b><span class="no g1">6</span>用 rocprof 找慢点</b><p>6.7 倍悬案:kernel trace 定位慢 dispatch;多变量混杂,先别急着归因。</p></a></div>
+    <div class="chp"><a href="part1.html"><b><span class="no g1">7</span>读懂 Roofline 图</b><p>带宽斜线与算力水平线;看工作点在拐点哪侧,选"省搬运"还是"省计算"。</p></a></div>
+    <div class="chp"><a href="part2.html"><b><span class="no g2">8</span>逐元素算子</b><p>Vector Add:两种范式、12B:1FLOP、合并访存 6.95 倍实验。(另有交互版)</p></a></div>
+    <div class="chp"><a href="part2.html"><b><span class="no g2">9</span>归约算子</b><p>数据竞争→树形归约→LDS+屏障→wave shuffle→二阶段;34.5ms→0.051ms。</p></a></div>
+    <div class="chp"><a href="part2.html"><b><span class="no g2">10</span>归一化 Softmax</b><p>减最大值救数值;三 kernel→LDS 融合→Triton mask 补 -inf,0.744→0.038ms。</p></a></div>
+    <div class="chp"><a href="part2.html"><b><span class="no g2">11</span>GEMM 矩阵乘</b><p>把算法固有的复用落到 LDS tile;B 步长是 N 不是 K;tile 选错差 12.8 倍。</p></a></div>
+    <div class="chp"><a href="part2.html"><b><span class="no g2">12</span>融合 Attention</b><p>在线 Softmax:状态按"汇率"折算;教学版 online 反而慢——融合不是免费的。</p></a></div>
+    <div class="chp"><a href="part2.html"><b><span class="no g2">13</span>结业:RMSNorm</b><p>三种模式合一,26× 优化闭环;七步迁移法,从这里走向独立优化。</p></a></div>
+    <div class="chp"><a href="part3.html"><b><span class="no g3">14</span>Agent 入门</b><p>Agent=LLM+工具+循环;权威工具是证物,自由工具是闲聊。</p></a></div>
+    <div class="chp"><a href="part3.html"><b><span class="no g3">15</span>工具封装</b><p>结构化体检报告单;工具失败不算任务失败;accept_candidate 唯一晋升入口。</p></a></div>
+    <div class="chp"><a href="part3.html"><b><span class="no g3">16</span>优化 Agent 设计</b><p>六步主循环;一次只改一个机制;反思三层次;R5 失败回退的成熟。</p></a></div>
+    <div class="chp"><a href="part3.html"><b><span class="no g3">17</span>多轮优化实战</b><p>10 轮账本:5 接受 5 拒绝,0.705→0.322ms(2.19×);诚实边界不可外推。</p></a></div>
+    <div class="chp"><a href="part4.html"><b><span class="no g4">18</span>YOLO 部署(Alpha)</b><p>部署→baseline→profiling→建议→对比→报告;Agent 能调旋钮,不能造发动机。</p></a></div>
+    <div class="chp"><a href="part4.html"><b><span class="no g4">19</span>LLM 解码实战</b><p>decode 吞吐=权重字节÷带宽;统一 nw=1 后 Q8 反超 Q4 34%——组合实验思维。</p></a></div>
+  </div>
+</section>
+
+<section id="how">
+  <div class="sec-head"><h2>🧭 怎么用这本教材</h2></div>
+  <div class="grid2">
+    <div class="callout ok">
+      <div class="tt">✅ 推荐学习路线</div>
+      <b>路线 A · 零基础(顺序读)</b>:①入门 → ②量准 → ③算子 → ④Agent → ⑤实战,全程 2-3 周。<br>
+      <b>路线 B · 会 CUDA / 老手</b>:直接 ③算子篇 + ④Agent 篇,遇到计时问题回 ②第5章。<br>
+      <b>路线 C · 只想懂原理</b>:②量准(第7章 Roofline)+ ③算子篇,跳过动手环节。
+    </div>
+    <div class="callout gold">
+      <div class="tt">📖 每章的正确打开方式</div>
+      ① 先读"一句话主旨"建立预期 → ② 看比喻卡建立直觉 → ③ 对照原文跑代码 → ④ 记住每章的<b>负结果卡</b>(它们和成功结论同样值钱)→ ⑤ 用章末验收标准自测。
+    </div>
+  </div>
+  <div class="callout warn">
+    <div class="tt">⚠️ 本教材与原文的关系</div>
+    本站是<b>白话重述与图解辅助</b>,所有数据引自原文实测(基线平台:RX 9070 XT / ROCm 7.13 / Ubuntu 24.04;部分章节用 Radeon 8060S、RX 7900 XTX,已标注)。代码、命令与完整推导请以<a href="https://github.com/datawhalechina/hello-gpu" target="_blank">原文仓库</a>为准;如与本站有出入,以原文为准。
+  </div>
+  <div class="callout plain">
+    <div class="tt">🔁 全书方法论闭环(在每一章反复出现)</div>
+    <div class="loop">
+      <span class="st">固定语义与正确性</span><span class="ar">→</span>
+      <span class="st">可信计时(第5章)</span><span class="ar">→</span>
+      <span class="st">定位慢点(第6章)</span><span class="ar">→</span>
+      <span class="st">Roofline 选方向(第7章)</span><span class="ar">→</span>
+      <span class="st">单变量实验</span><span class="ar">→</span>
+      <span class="st">记录结果(含负结果)</span>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <p>📖 原著:<a href="https://github.com/datawhalechina/hello-gpu" target="_blank">datawhalechina/hello-gpu</a>(dev 分支,共 20 章) · 本白话图解版为其学习辅助材料,版权归原作者所有。</p>
+  <p>🏗️ 本站为纯静态页面(GitHub Pages 即可托管),无任何外部依赖。</p>
+</footer>
+</div>
+</body>
+</html>

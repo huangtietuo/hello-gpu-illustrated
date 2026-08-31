@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>第二部分 · Profiling 篇(第5-7章) | Hello GPU 图解教材</title>
+<style>
+  :root{
+    --bg:#f5f6fa; --card:#ffffff; --ink:#232936; --ink2:#5a6474; --line:#e3e6ee;
+    --hip:#e8590c; --hip-bg:#fff4e6; --hip-deep:#b23a00;
+    --tri:#1971c2; --tri-bg:#e7f5ff; --tri-deep:#1864ab;
+    --ok:#2f9e44; --ok-bg:#ebfbee;
+    --bad:#e03131; --bad-bg:#fff0f0;
+    --gold:#f59f00; --gold-bg:#fff9db;
+    --violet:#6741d9; --violet-bg:#f3f0ff;
+    --acc:#e8890c; --acc-deep:#b23a00; --acc-bg:#fff4e6;
+    --code-bg:#1b1e27; --code-ink:#e8eaf0;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html{scroll-behavior:smooth;}
+  body{font-family:"PingFang SC","Microsoft YaHei","Segoe UI",system-ui,sans-serif; background:var(--bg); color:var(--ink); line-height:1.75; font-size:16px;}
+  .wrap{max-width:1060px; margin:0 auto; padding:0 20px 90px;}
+  .topbar{position:sticky; top:0; z-index:50; background:rgba(245,246,250,.92); backdrop-filter:blur(8px); border-bottom:1px solid var(--line);}
+  .topbar .in{max-width:1060px; margin:0 auto; padding:10px 20px; display:flex; gap:14px; align-items:center; flex-wrap:wrap;}
+  .logo{font-weight:800; color:var(--ink); text-decoration:none; white-space:nowrap;}
+  .logo b{color:var(--acc);}
+  .topbar nav{display:flex; gap:4px; flex-wrap:wrap;}
+  .topbar nav a{font-size:13px; color:var(--ink2); text-decoration:none; padding:4px 9px; border-radius:20px; white-space:nowrap;}
+  .topbar nav a:hover{background:var(--ink); color:#fff;}
+  .topbar nav a.cur{background:var(--acc); color:#fff;}
+  .hero{margin-top:34px; padding:42px 38px; border-radius:22px; color:#fff; background:linear-gradient(120deg,#2e1f08 0%,#5c3d0e 55%,#7a4a08 100%); position:relative; overflow:hidden;}
+  .hero::after{content:""; position:absolute; right:-70px; top:-70px; width:280px; height:280px; border-radius:50%; background:radial-gradient(circle,rgba(255,212,59,.28),transparent 65%);}
+  .hero .kicker{font-size:13px; letter-spacing:2px; opacity:.75; margin-bottom:12px;}
+  .hero h1{font-size:clamp(25px,4vw,38px); line-height:1.3; margin-bottom:14px;}
+  .hero h1 em{font-style:normal; color:#ffd43b;}
+  .hero p{max-width:760px; color:#f0e2c8; font-size:15.5px;}
+  .chips{margin-top:20px; display:flex; gap:10px; flex-wrap:wrap;}
+  .chip{font-size:12.5px; padding:5px 13px; border-radius:20px; background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.22);}
+  .hero .oneline{margin-top:24px; padding:14px 18px; border-left:4px solid #ffd43b; background:rgba(255,255,255,.07); border-radius:0 12px 12px 0; font-size:15px; color:#f1f3f8;}
+  section{margin-top:56px;}
+  .sec-head{display:flex; align-items:baseline; gap:14px; margin-bottom:8px;}
+  .sec-num{flex:none; width:46px; height:46px; border-radius:14px; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:18px; color:#fff; background:linear-gradient(135deg,#ffd43b,#f08c00); transform:rotate(-3deg); box-shadow:3px 4px 0 rgba(240,140,0,.22);}
+  .sec-head h2{font-size:clamp(20px,3vw,26px);}
+  .sec-sub{color:var(--ink2); font-size:14.5px; margin-bottom:20px; padding-left:60px;}
+  .card{background:var(--card); border:1px solid var(--line); border-radius:16px; padding:24px 26px; margin-top:18px; box-shadow:0 1px 3px rgba(35,41,54,.05);}
+  .card h3{font-size:18px; margin-bottom:12px;}
+  p + p{margin-top:10px;}
+  .muted{color:var(--ink2);}
+  code.inline{background:#eef0f6; border:1px solid #e0e3ec; padding:1px 7px; border-radius:6px; font-size:13.5px; font-family:"Cascadia Code",Consolas,Menlo,monospace; color:#1c2a4a; white-space:nowrap;}
+  .callout{border-radius:14px; padding:16px 20px; margin-top:18px; font-size:15px; border:1px solid;}
+  .callout .tt{font-weight:800; margin-bottom:6px; display:flex; gap:8px; align-items:center;}
+  .callout.plain{background:#f4f5f9; border-color:#e3e6ee;}
+  .callout.analogy{background:#fdf6ec; border-color:#f3d9a4;}
+  .callout.analogy .tt{color:#b8860b;}
+  .callout.warn{background:var(--bad-bg); border-color:#ffc2c2;}
+  .callout.warn .tt{color:var(--bad);}
+  .callout.ok{background:var(--ok-bg); border-color:#b2f2bb;}
+  .callout.ok .tt{color:var(--ok);}
+  .callout.gold{background:var(--gold-bg); border-color:#ffe08a;}
+  .callout.gold .tt{color:#b8860b;}
+  .callout.violet{background:var(--violet-bg); border-color:#d0bfff;}
+  .callout.violet .tt{color:var(--violet);}
+  .grid2{display:grid; grid-template-columns:1fr 1fr; gap:18px;}
+  @media (max-width:820px){ .grid2{grid-template-columns:1fr;} .sec-sub{padding-left:0;} }
+  .code{background:var(--code-bg); color:var(--code-ink); border-radius:14px; margin-top:14px; font-family:"Cascadia Code",Consolas,Menlo,monospace; font-size:13.5px; line-height:1.7; overflow-x:auto;}
+  .code .cap{display:flex; justify-content:space-between; padding:9px 16px; font-size:12.5px; color:#9aa3b5; border-bottom:1px solid #2a2e3a; font-family:"PingFang SC","Microsoft YaHei",sans-serif;}
+  .code .cap .lang{padding:2px 10px; border-radius:6px; background:#2a2e3a; letter-spacing:1px;}
+  .code pre{padding:16px 18px; white-space:pre;}
+  .code .k{color:#ff8787;} .code .t{color:#74c0fc;} .code .f{color:#ffd43b;} .code .n{color:#f7b26a;} .code .c{color:#7d859c; font-style:italic;} .code .s{color:#a9e34b;}
+  table{width:100%; border-collapse:collapse; margin-top:14px; font-size:14px; background:#fff; border-radius:12px; overflow:hidden;}
+  th,td{padding:9px 13px; border-bottom:1px solid var(--line); text-align:left;}
+  th{background:#f1f3f8; font-size:13px; color:#3c4658;}
+  tr:last-child td{border-bottom:none;}
+  .num{font-variant-numeric:tabular-nums; white-space:nowrap;}
+  .t-bad td{background:var(--bad-bg);}
+  footer{margin-top:70px; padding-top:24px; border-top:1px solid var(--line); color:var(--ink2); font-size:13.5px;}
+  footer a{color:var(--tri);}
+  .partnav{display:flex; justify-content:space-between; gap:14px; margin-top:60px; flex-wrap:wrap;}
+  .partnav a{text-decoration:none; font-weight:700; padding:14px 20px; border-radius:14px; background:#fff; border:1.5px solid var(--line); color:var(--ink); font-size:14.5px;}
+  .partnav a:hover{border-color:var(--acc); color:var(--acc-deep);}
+  .flow{display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-top:14px;}
+  .flow .st{background:#fff; border:2px solid #ffd8a8; border-radius:10px; padding:8px 14px; font-size:13.5px; font-weight:700;}
+  .flow .ar{color:#8a93a6; font-weight:800;}
+  .rw{background:#fff; border:1px solid var(--line); border-radius:14px; margin-top:16px; overflow:hidden;}
+  .rw svg{display:block; width:100%; height:auto;}
+  .rw .cap2{padding:10px 16px; font-size:13px; color:var(--ink2); border-top:1px solid var(--line); background:#fafbfe;}
+  .timeline{margin-top:16px;}
+  .tl-row{display:grid; grid-template-columns:150px 1fr; gap:10px; align-items:center; margin-bottom:8px; font-size:13px;}
+  .tl-name{font-weight:700; color:var(--ink2); text-align:right;}
+  .tl-track{position:relative; height:30px; background:#eef0f6; border-radius:8px;}
+  .tl-bar{position:absolute; top:4px; height:22px; border-radius:6px; display:flex; align-items:center; justify-content:center; color:#fff; font-size:11px; font-weight:700; white-space:nowrap;}
+</style>
+</head>
+<body>
+<div class="topbar"><div class="in">
+  <a class="logo" href="index.html">Hello·GPU <b>图解教材</b></a>
+  <nav>
+    <a href="index.html">首页</a>
+    <a href="part0.html">① 入门 0-4</a>
+    <a href="part1.html" class="cur">② 量准 5-7</a>
+    <a href="part2.html">③ 算子 8-13</a>
+    <a href="part3.html">④ Agent 14-17</a>
+    <a href="part4.html">⑤ 实战 18-19</a>
+  </nav>
+</div></div>
+
+<div class="wrap">
+
+<header class="hero">
+  <div class="kicker">PART 1 · PROFILING 篇 · 第 5-7 章</div>
+  <h1>Profiling 篇:<em>把时间量准</em>,把慢点找准,把方向选对</h1>
+  <p>全书最重要的一篇,也最容易被跳过。三章连成一条闭环:<b>第5章</b>让测量可信(warmup / repeat / GPU event),<b>第6章</b>用 rocprofv3 把"程序慢"缩小到"哪个 kernel 慢",<b>第7章</b>用 Roofline 图判断该往"省访存"还是"省计算"的方向使劲。</p>
+  <div class="chips">
+    <span class="chip">warmup / repeat / synchronize</span>
+    <span class="chip">GPU Event 计时</span>
+    <span class="chip">rocprofv3 kernel-trace</span>
+    <span class="chip">合并访存 6.7 倍实验</span>
+    <span class="chip">Roofline 读图</span>
+  </div>
+  <div class="oneline">💡 <b>本篇一句话:</b>测不准的时候,"优化"就是赌博。先把尺子校准,再谈快慢。</div>
+</header>
+
+<!-- ============ CH5 ============ -->
+<section id="ch5">
+  <div class="sec-head"><div class="sec-num">5</div><h2>benchmark 与可信计时:你测的数字凭什么信?</h2></div>
+  <div class="sec-sub">性能优化不从改代码开始,从把时间量准开始。</div>
+
+  <div class="card">
+    <h3>🔥 四个"无聊"细节,决定数字可不可信</h3>
+    <table>
+      <tr><th>细节</th><th>为什么必须做</th><th>白话理解</th></tr>
+      <tr><td><b>Warmup(热身,约5-20次)</b></td><td>首轮含一次性开销:JIT 编译、缓存冷启动、GPU 时钟爬频</td><td>运动员上场要热身,第一套动作慢不是水平问题</td></tr>
+      <tr><td><b>Repeat(重复,几十到几百次)</b></td><td>单次结果只是偶然:后台任务、调度抖动都会让数字漂移</td><td>量血压要多量几次看中位数,不能一锤定音</td></tr>
+      <tr><td><b>Synchronize(同步)</b></td><td>CPU 发命令就返回了,不等 GPU 干完;不同步量到的是"提交耗时"</td><td><code class="inline">time.time()</code> 是"下单时间",GPU event 才是"包裹在途时间"</td></tr>
+      <tr><td><b>GPU Event 计时</b></td><td>在设备时间线上打两个点取间隔,精度够量 μs 级 kernel</td><td>给 GPU 的工作本身打卡,而不是给办公室的门打卡</td></tr>
+    </table>
+    <div class="code">
+      <div class="cap"><span>可信计时骨架(PyTorch)</span><span class="lang">Python</span></div>
+<pre><span class="k">for</span> _ <span class="k">in</span> <span class="f">range</span>(warmup):            <span class="c"># ① 热身,甩掉编译/缓存/爬频</span>
+    op(x)
+torch.cuda.<span class="f">synchronize</span>()
+<span class="k">for</span> i <span class="k">in</span> <span class="f">range</span>(repeats):          <span class="c"># ② 正式计时 N 次</span>
+    start[i].<span class="f">record</span>(); op(x); end[i].<span class="f">record</span>()
+torch.cuda.<span class="f">synchronize</span>()          <span class="c"># ③ 等 GPU 全部干完</span>
+times = [s.<span class="f">elapsed_time</span>(e) <span class="k">for</span> s, e <span class="k">in</span> <span class="f">zip</span>(start, end)]  <span class="c"># ④ 汇总 median/min/p95</span></pre>
+    </div>
+    <div class="callout analogy">
+      <div class="tt">🗣️ 白话:统计量各有分工</div>
+      <b>mean</b> 容易被几个"异常慢"拖累;<b>median</b> 代表大多数情况;<b>min</b> 最像"没被任何干扰"的一次,常用来估带宽上限;<b>p95/std</b> 看波动。报数字至少带上 median 和 min。
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>🧪 两个经典骗局,本章现场拆穿</h3>
+    <div class="grid2">
+      <div class="callout warn">
+        <div class="tt">骗局一:缓存伪提升</div>
+        第二次跑同一份输入明显变快?那只是数据被 L2"捂热"了,不是代码变好。输入刚好塞进缓存时数字会"异常好看"——所以<b>要换多个 size 看趋势</b>。"我什么都没改它就快了"= 背过原题的模拟考。
+      </div>
+      <div class="callout warn">
+        <div class="tt">骗局二:fp16 时间减半 = 快一倍?</div>
+        实测 4096²:fp32 0.337 ms(601 GB/s),fp16 0.173 ms(587 GB/s)。时间确实约一半,但<b>带宽几乎没变</b>——省的是字节数(fp16 每数 2 字节),不是搬运效率。口径不同,结论完全不同。
+      </div>
+    </div>
+    <h3>📏 用 footprint 扫描,画出缓存层级</h3>
+    <p>只跑一个规模永远看不见缓存。按工作集大小分级测 copy 带宽(一读一写):</p>
+    <table>
+      <tr><th>工作集</th><th>8 MiB</th><th>64 MiB</th><th>256 MiB</th></tr>
+      <tr><td>有效带宽</td><td class="num">785.1 GB/s(踩中 L2!)</td><td class="num">572.8 GB/s</td><td class="num">568.6 GB/s</td></tr>
+    </table>
+    <p class="muted">8 MiB 的"高分"是 L2 命中的红利;64 MiB 之后 ~570 GB/s 才是 GDDR6 的真实水平。比喻:用大小不同的行李去试电梯,才能画出"客梯/货梯"两层结构。</p>
+    <div class="callout ok">
+      <div class="tt">✅ 本章验收:十条检查清单</div>
+      固定规模 · 固定 dtype · 区分初始化与正式计时 · warmup · repeat · synchronize · 计时器选对(禁用 <code class="inline">time.time()</code> 量 μs kernel)· 锁时钟/排后台 · 记录环境 · <b>一次只改一个变量</b>。
+    </div>
+  </div>
+</section>
+
+<!-- ============ CH6 ============ -->
+<section id="ch6">
+  <div class="sec-head"><div class="sec-num">6</div><h2>用 rocprof 找到慢在哪里:一个 6.7 倍的悬案</h2></div>
+  <div class="sec-sub">两个 vector add 差 6.7 倍——bench 确认差距,rocprofv3 定位慢点,但先别急着下结论。</div>
+
+  <div class="card">
+    <h3>🔎 悬案:linecross 版慢了 6.7 倍</h3>
+    <p><b>linecross</b>(本章自造的对照名):每个 lane 负责 stride 个连续元素,相邻 lane 的起点隔开 stride×4 字节。stride=32 时,同一排 32 个 lane 要的地址分散在 32 段不同的地方——合并访存彻底泡汤。</p>
+    <table>
+      <tr><th>实现</th><th>耗时</th><th>有效带宽</th><th>慢多少</th></tr>
+      <tr><td>coalesced(连续版)</td><td class="num">0.334 ms</td><td class="num">603 GB/s</td><td class="num">—</td></tr>
+      <tr><td>linecross stride=1</td><td class="num">0.336 ms</td><td class="num">599 GB/s</td><td class="num">≈1.0×</td></tr>
+      <tr class="t-bad"><td>linecross stride=32</td><td class="num">2.25 ms</td><td class="num">89.7 GB/s</td><td class="num"><b>≈6.7×</b></td></tr>
+    </table>
+    <div class="callout analogy">
+      <div class="tt">🗣️ 白话:收作业</div>
+      连续版像全班按学号连坐,老师一趟收齐;linecross stride=32 像每人只收"隔 32 排"的座位——跑动距离和趟数全变了。
+    </div>
+    <h3>🎫 rocprofv3:给每个 kernel 打上下班卡</h3>
+    <div class="code">
+      <div class="cap"><span>采集 kernel 级 trace</span><span class="lang">bash</span></div>
+<pre>rocprofv3 --kernel-trace -o logs/kt.csv -f csv -- \
+    ./vector_add_bench --kernel linecross --size 16777216 --block 256 --stride 32 \
+    --warmup 5 --repeat 10</pre>
+    </div>
+    <p>CSV 里每个 dispatch 一行:关键列 <code class="inline">Kernel_Name</code>、起止时间戳(纳秒)、<code class="inline">Grid_Size</code>、VGPR/SGPR。它把"程序慢"缩小成"哪个 kernel 慢、慢在哪一栏"。</p>
+    <table>
+      <tr><th>kernel</th><th>单次最短</th><th>Grid Size</th><th>VGPR</th></tr>
+      <tr><td>coalesced</td><td class="num">329 μs</td><td class="num">16,777,216</td><td class="num">8</td></tr>
+      <tr><td>linecross(s32)</td><td class="num">2202 μs</td><td class="num">524,288(1/32)</td><td class="num">16</td></tr>
+    </table>
+    <div class="callout warn">
+      <div class="tt">⚠️ 反直觉:还不能急着归因!</div>
+      stride=32 的 6.7 倍<b>不能全记在"合并访存"头上</b>——它同时改了三件事:①地址排布 ②每线程循环次数 ③Grid Size。有效带宽 603→89.7 只是同一份时间换了个单位,不算第二份独立证据。stride 扫描(stride 1→256,耗时 0.34→25.3 ms)展示的是"组合效果"。profiler 帮你<b>找慢点</b>,不自动替你<b>证明原因</b>。
+    </div>
+    <div class="callout ok">
+      <div class="tt">✅ 本章行动项</div>
+      设计公平对照:固定线程总数与每线程工作量,<b>只改索引公式</b>(连续版 <code class="inline">i = base + j×32 + lane</code>,分散版 <code class="inline">i = base + lane×32 + j</code>)——这正是第 8 章 v1 实验要做的事,两章在这里握手。
+    </div>
+  </div>
+</section>
+
+<!-- ============ CH7 ============ -->
+<section id="ch7">
+  <div class="sec-head"><div class="sec-num">7</div><h2>读懂 Roofline 图:一张地图决定优化方向</h2></div>
+  <div class="sec-sub">把时间、数据量、硬件上限放到同一张图上,一眼看出该往哪使劲。</div>
+
+  <div class="card">
+    <h3>⛰️ 什么是 Roofline?</h3>
+    <p>横轴是<b>算术强度 AI = 计算量 ÷ 搬运量</b>(FLOP/Byte),纵轴是实际性能(FLOPS),两张对数轴。硬件有两条"天花板":<b>带宽斜线</b>(搬运极限)和<b>算力水平线</b>(计算极限),交点叫<b>拐点</b>。工作点落在拐点左边 → 访存受限,优化方向是"少搬/复用/融合";落在右边 → 算力受限,方向是"少算/降精度/上矩阵指令"。</p>
+    <div class="rw">
+      <svg viewBox="0 0 900 380" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Roofline 示意图">
+        <rect width="900" height="380" fill="#ffffff"/>
+        <g font-family="sans-serif" font-size="14" fill="#5a6474">
+          <line x1="70" y1="320" x2="860" y2="320" stroke="#cfd4e0" stroke-width="2"/>
+          <line x1="70" y1="320" x2="70" y2="30" stroke="#cfd4e0" stroke-width="2"/>
+          <text x="640" y="352">算术强度 (FLOP/Byte) →</text>
+          <text x="24" y="230" transform="rotate(-90 24 230)" font-size="12">性能 (TFLOPS) →</text>
+          <text x="30" y="46" font-size="12">屋顶 = 算力上限</text>
+          <text x="760" y="310" font-size="12">→ 搬运上限</text>
+          <!-- roof: slanted line from (110,320) to (430,90), then flat to 850 -->
+          <polyline points="110,320 430,90 850,90" fill="none" stroke="#1971c2" stroke-width="3.5"/>
+          <text x="130" y="150" fill="#1971c2" font-weight="bold" font-size="13">带宽斜线 510 GB/s</text>
+          <text x="620" y="78" fill="#e03131" font-weight="bold" font-size="13">算力水平线 10.6 TFLOPS</text>
+          <!-- knee marker -->
+          <circle cx="430" cy="90" r="5" fill="#f59f00"/>
+          <text x="398" y="70" font-size="12.5" fill="#b8860b" font-weight="bold">拐点</text>
+          <!-- work points: AI=0.083 log position between 0.1 and 1 -->
+          <!-- coalesced: high -->
+          <circle cx="252" cy="72" r="9" fill="#2f9e44"/>
+          <text x="268" y="66" font-size="13" fill="#2b8a3e" font-weight="bold">coalesced 工作点</text>
+          <text x="268" y="84" font-size="11.5" fill="#5a6474">0.334 ms · 贴着屋顶</text>
+          <!-- linecross: low -->
+          <circle cx="252" cy="268" r="9" fill="#e03131"/>
+          <text x="268" y="262" font-size="13" fill="#e03131" font-weight="bold">linecross 工作点</text>
+          <text x="268" y="280" font-size="11.5" fill="#5a6474">2.25 ms · 离屋顶很远</text>
+          <!-- AI axis ticks -->
+          <text x="240" y="342" font-size="12">0.083(两者相同!)</text>
+          <text x="420" y="342" font-size="12">≈拐点</text>
+          <text x="800" y="342" font-size="12">大</text>
+        </g>
+      </svg>
+      <div class="cap2">▲ 第6章两个实现的 Roofline(数据来自原文):横轴位置相同(AI 都是 0.083),纵轴却差 6.7 倍——<b>AI 相同不代表表现相同</b>,合并访存决定了你"贴不贴得上屋顶"。</div>
+    </div>
+    <div class="callout analogy">
+      <div class="tt">🗣️ 白话:高速公路地图</div>
+      两条天花板是"限速线",你的 kernel 是"车"。看图三连问:<b>①车在地图哪一侧?</b>(该省油还是该换引擎)<b>②车速多高?</b><b>③离头顶的天花板还差多少?</b>——差距最大的那条,就是值得发力的方向。
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>🧾 三个公式 + 一页记录</h3>
+    <div class="code">
+      <div class="cap"><span>三个换算口径</span><span class="lang">text</span></div>
+<pre>算术强度  AI = F / B          <span class="c"># F=计算量(数操作数), B=搬运量(dtype×元素数)</span>
+实际性能  P  = F / t          <span class="c"># t 来自第5章的 GPU event 实测</span>
+有效带宽  BW = B / t          <span class="c"># 与参考线比较用,注意口径(见下)</span></pre>
+    </div>
+    <div class="callout warn">
+      <div class="tt">⚠️ 有效带宽 603 &gt; 参考线 510 GB/s,是超光速了吗?</div>
+      不是。有效带宽统计的是<b>算法有效字节</b>,工作集可能被缓存接住、写路径也可能不走 DRAM。它<b>适合比较两个实现</b>,不能当真实 DRAM 流量。比喻:按"净货重"算的效率超过了公路限速——只是口径不同,不是超能力。
+    </div>
+    <table>
+      <tr><th>工作点位置</th><th>含义</th><th>下一步排查</th></tr>
+      <tr><td>AI 小,贴着斜线</td><td>典型访存受限</td><td>减访存 / 融合算子 / 提高数据复用</td></tr>
+      <tr><td>AI 小,离斜线远</td><td>访存效率不高</td><td>查地址连续性(合并访存)、多余读写</td></tr>
+      <tr><td>AI 大,贴着水平线</td><td>典型算力受限</td><td>WMMA / 降精度 / 减少计算</td></tr>
+      <tr><td>离两条线都远</td><td>没吃到任何上限</td><td>查 launch 开销、同步、输入规模太小</td></tr>
+    </table>
+    <div class="callout ok">
+      <div class="tt">✅ Part 1 四步闭环(整个 Part 2 都在复用)</div>
+      <b>量准</b>(数字可复现)→ <b>找到慢点</b>(benchmark + kernel trace)→ <b>解释</b>(Roofline + 源码:访存?计算?启动?)→ <b>验证</b>(只改一个变量,看结果是否按预期变化)。<br><br>
+      最后学写<b>一页性能记录</b>:环境与对象 / 运行命令 / 关键结果 / 当前判断(一句话)/ 下一步(单变量实验)——给三个月后的自己留字条。
+    </div>
+  </div>
+</section>
+
+<div class="partnav">
+  <a href="part0.html">← 上一部分 · 入门篇</a>
+  <a href="part2.html">下一部分 · 算子篇(第8-13章):亲手写算子 →</a>
+</div>
+
+<footer>
+  <p>内容整理自 <a href="https://github.com/datawhalechina/hello-gpu" target="_blank">datawhalechina/hello-gpu</a> 第 5-7 章 · 白话重述与图解,数据引自原文实测(RX 9070 XT / ROCm 7.13);如有出入以原文为准。</p>
+</footer>
+</div>
+</body>
+</html>

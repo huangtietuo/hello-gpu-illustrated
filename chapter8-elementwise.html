@@ -1,0 +1,1106 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>第8章 · 逐元素算子 Element-Wise —— 白话图解 | Hello GPU 学习站</title>
+<meta name="description" content="用一道 Vector Add,看懂 GPU 上最基础的一类算子:HIP 线程级编程 与 Triton 分块(tile)编程,合并访存、成本模型与实测数据,全用白话和动画讲清楚。">
+<style>
+  :root{
+    --bg:#f5f6fa; --card:#ffffff; --ink:#232936; --ink2:#5a6474; --line:#e3e6ee;
+    --hip:#e8590c; --hip-bg:#fff4e6; --hip-deep:#b23a00;
+    --tri:#1971c2; --tri-bg:#e7f5ff; --tri-deep:#1864ab;
+    --ok:#2f9e44; --ok-bg:#ebfbee;
+    --bad:#e03131; --bad-bg:#fff0f0;
+    --gold:#f59f00; --gold-bg:#fff9db;
+    --violet:#6741d9; --violet-bg:#f3f0ff;
+    --code-bg:#1b1e27; --code-ink:#e8eaf0;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html{scroll-behavior:smooth;}
+  body{
+    font-family:"PingFang SC","Microsoft YaHei","Segoe UI",system-ui,sans-serif;
+    background:var(--bg); color:var(--ink); line-height:1.75; font-size:16px;
+  }
+  .wrap{max-width:1060px; margin:0 auto; padding:0 20px 90px;}
+
+  /* ===== 顶部导航 ===== */
+  .topbar{
+    position:sticky; top:0; z-index:50; background:rgba(245,246,250,.92); backdrop-filter:blur(8px);
+    border-bottom:1px solid var(--line);
+  }
+  .topbar .in{max-width:1060px; margin:0 auto; padding:10px 20px; display:flex; gap:14px; align-items:center; flex-wrap:wrap;}
+  .logo{font-weight:800; letter-spacing:.5px; color:var(--ink); text-decoration:none; white-space:nowrap;}
+  .logo b{color:var(--hip);}
+  .topbar nav{display:flex; gap:4px; flex-wrap:wrap;}
+  .topbar nav a{
+    font-size:13px; color:var(--ink2); text-decoration:none; padding:4px 9px; border-radius:20px; white-space:nowrap;
+  }
+  .topbar nav a:hover{background:var(--ink); color:#fff;}
+
+  /* ===== Hero ===== */
+  .hero{
+    margin-top:34px; padding:44px 38px; border-radius:22px; color:#fff;
+    background:linear-gradient(120deg,#1a1d29 0%,#23304d 55%,#14304a 100%); position:relative; overflow:hidden;
+  }
+  .hero::after{content:""; position:absolute; right:-70px; top:-70px; width:280px; height:280px; border-radius:50%;
+    background:radial-gradient(circle,rgba(232,89,12,.35),transparent 65%);}
+  .hero::before{content:""; position:absolute; left:-60px; bottom:-90px; width:260px; height:260px; border-radius:50%;
+    background:radial-gradient(circle,rgba(25,113,194,.4),transparent 65%);}
+  .hero .kicker{font-size:13px; letter-spacing:2px; opacity:.75; margin-bottom:12px;}
+  .hero h1{font-size:clamp(26px,4.2vw,40px); line-height:1.3; margin-bottom:14px;}
+  .hero h1 em{font-style:normal; color:#ffd43b;}
+  .hero p{max-width:720px; color:#c9d2e3; font-size:15.5px;}
+  .chips{margin-top:20px; display:flex; gap:10px; flex-wrap:wrap;}
+  .chip{font-size:12.5px; padding:5px 13px; border-radius:20px; background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.22);}
+  .chip.orange{background:rgba(232,89,12,.28); border-color:rgba(255,160,90,.5);}
+  .chip.blue{background:rgba(25,113,194,.32); border-color:rgba(105,175,235,.5);}
+  .hero .oneline{
+    margin-top:24px; padding:14px 18px; border-left:4px solid #ffd43b; background:rgba(255,255,255,.07);
+    border-radius:0 12px 12px 0; font-size:15px; color:#f1f3f8;
+  }
+
+  /* ===== 章节通用 ===== */
+  section{margin-top:56px;}
+  .sec-head{display:flex; align-items:baseline; gap:14px; margin-bottom:8px;}
+  .sec-num{
+    flex:none; width:44px; height:44px; border-radius:14px; display:flex; align-items:center; justify-content:center;
+    font-weight:800; font-size:19px; color:#fff; background:linear-gradient(135deg,#49546f,#232936);
+    transform:rotate(-3deg); box-shadow:3px 4px 0 rgba(35,41,54,.15);
+  }
+  section[data-accent="hip"] .sec-num{background:linear-gradient(135deg,#ff922b,#e8590c); box-shadow:3px 4px 0 rgba(232,89,12,.2);}
+  section[data-accent="tri"] .sec-num{background:linear-gradient(135deg,#4dabf7,#1971c2); box-shadow:3px 4px 0 rgba(25,113,194,.2);}
+  section[data-accent="gold"] .sec-num{background:linear-gradient(135deg,#ffd43b,#f08c00); box-shadow:3px 4px 0 rgba(240,140,0,.22);}
+  section[data-accent="green"] .sec-num{background:linear-gradient(135deg,#69db7c,#2f9e44); box-shadow:3px 4px 0 rgba(47,158,68,.2);}
+  .sec-head h2{font-size:clamp(21px,3vw,27px);}
+  .sec-sub{color:var(--ink2); font-size:14.5px; margin-bottom:20px; padding-left:58px;}
+
+  .card{background:var(--card); border:1px solid var(--line); border-radius:16px; padding:24px 26px; margin-top:18px;
+        box-shadow:0 1px 3px rgba(35,41,54,.05);}
+  .card h3{font-size:18px; margin-bottom:12px; display:flex; align-items:center; gap:8px;}
+  .card h4{font-size:15.5px; margin:18px 0 8px;}
+  p + p{margin-top:10px;}
+  .muted{color:var(--ink2);}
+  b.kw{color:var(--hip-deep);}
+  b.kw2{color:var(--tri-deep);}
+  .num{font-variant-numeric:tabular-nums;}
+  code.inline{
+    background:#eef0f6; border:1px solid #e0e3ec; padding:1px 7px; border-radius:6px; font-size:13.5px;
+    font-family:"Cascadia Code",Consolas,Menlo,monospace; color:#1c2a4a; white-space:nowrap;
+  }
+
+  /* ===== 提示框 ===== */
+  .callout{border-radius:14px; padding:16px 20px; margin-top:18px; font-size:15px; border:1px solid;}
+  .callout .tt{font-weight:800; margin-bottom:6px; display:flex; gap:8px; align-items:center;}
+  .callout.plain{background:#f4f5f9; border-color:#e3e6ee;}
+  .callout.analogy{background:#fdf6ec; border-color:#f3d9a4;}
+  .callout.analogy .tt{color:#b8860b;}
+  .callout.warn{background:var(--bad-bg); border-color:#ffc2c2;}
+  .callout.warn .tt{color:var(--bad);}
+  .callout.ok{background:var(--ok-bg); border-color:#b2f2bb;}
+  .callout.ok .tt{color:var(--ok);}
+  .callout.hip{background:var(--hip-bg); border-color:#ffd8a8;}
+  .callout.hip .tt{color:var(--hip-deep);}
+  .callout.tri{background:var(--tri-bg); border-color:#a5d8ff;}
+  .callout.tri .tt{color:var(--tri-deep);}
+  .callout.gold{background:var(--gold-bg); border-color:#ffe08a;}
+  .callout.gold .tt{color:#b8860b;}
+  .callout.violet{background:var(--violet-bg); border-color:#d0bfff;}
+  .callout.violet .tt{color:var(--violet);}
+
+  /* ===== 双栏 ===== */
+  .grid2{display:grid; grid-template-columns:1fr 1fr; gap:18px;}
+  @media (max-width:820px){ .grid2{grid-template-columns:1fr;} .sec-sub{padding-left:0;} }
+
+  /* ===== 代码块 ===== */
+  .code{
+    background:var(--code-bg); color:var(--code-ink); border-radius:14px; margin-top:14px;
+    font-family:"Cascadia Code",Consolas,Menlo,monospace; font-size:13.5px; line-height:1.7; overflow-x:auto;
+  }
+  .code .cap{
+    display:flex; justify-content:space-between; align-items:center; padding:9px 16px; font-size:12.5px;
+    color:#9aa3b5; border-bottom:1px solid #2a2e3a; font-family:"PingFang SC","Microsoft YaHei",sans-serif;
+  }
+  .code .cap .lang{padding:2px 10px; border-radius:6px; background:#2a2e3a; letter-spacing:1px;}
+  .code pre{padding:16px 18px; white-space:pre;}
+  .code .k{color:#ff8787;}      /* keyword */
+  .code .t{color:#74c0fc;}      /* type */
+  .code .f{color:#ffd43b;}      /* function */
+  .code .s{color:#a9e34b;}      /* string */
+  .code .n{color:#f7b26a;}      /* number */
+  .code .c{color:#7d859c; font-style:italic;} /* comment */
+  .code .hl{background:rgba(255,212,59,.14); display:inline-block; width:100%; border-left:3px solid #ffd43b;}
+
+  /* ===== 表格 ===== */
+  table{width:100%; border-collapse:collapse; margin-top:14px; font-size:14px; background:#fff; border-radius:12px; overflow:hidden;}
+  th,td{padding:9px 13px; border-bottom:1px solid var(--line); text-align:left;}
+  th{background:#f1f3f8; font-size:13px; color:#3c4658;}
+  tr:last-child td{border-bottom:none;}
+  td .num{white-space:nowrap;}
+  .t-hip td:first-child{border-left:4px solid var(--hip);}
+  .t-tri td:first-child{border-left:4px solid var(--tri);}
+  .t-bad td{background:var(--bad-bg);}
+  .t-good td:first-child{border-left:4px solid var(--ok);}
+
+  /* ===== 小方块格子(动画单元) ===== */
+  .cells{display:flex; flex-wrap:wrap; gap:5px; margin-top:10px;}
+  .cell{
+    width:42px; height:42px; border-radius:9px; display:flex; align-items:center; justify-content:center;
+    font-size:12px; font-weight:700; border:1.5px solid #cfd4e0; background:#fff; color:#8a93a6;
+    font-family:"Cascadia Code",Consolas,monospace; transition:all .25s;
+  }
+  .cell.on-a{background:var(--hip-bg); border-color:var(--hip); color:var(--hip-deep); transform:translateY(-3px);}
+  .cell.on-b{background:var(--tri-bg); border-color:var(--tri); color:var(--tri-deep); transform:translateY(-3px);}
+  .cell.on-c{background:var(--ok-bg); border-color:var(--ok); color:#2b8a3e; transform:translateY(-3px);}
+  .cell.valid{background:var(--ok-bg); border-color:var(--ok); color:#2b8a3e;}
+  .cell.masked{background:#eceef3; border-color:#cfd4e0; color:#adb5bd; text-decoration:line-through;}
+  .cell .lane{font-size:10px;}
+  .rowlab{font-size:13px; font-weight:700; margin:14px 0 2px; color:var(--ink2);}
+  .rowlab .dot{display:inline-block; width:10px; height:10px; border-radius:3px; margin-right:6px; vertical-align:baseline;}
+  .dot.a{background:var(--hip);} .dot.b{background:var(--tri);} .dot.c{background:var(--ok);}
+
+  .btns{display:flex; gap:10px; margin-top:14px; flex-wrap:wrap;}
+  .btn{
+    border:none; cursor:pointer; font-size:14px; font-weight:700; padding:9px 20px; border-radius:10px;
+    background:var(--ink); color:#fff; transition:transform .1s, opacity .2s; font-family:inherit;
+  }
+  .btn:hover{opacity:.88;} .btn:active{transform:scale(.96);}
+  .btn.ghost{background:#fff; color:var(--ink); border:1.5px solid #cfd4e0;}
+  .btn.orange{background:var(--hip);} .btn.blue{background:var(--tri);}
+
+  .stage{background:#f8f9fc; border:1px dashed #d5dae6; border-radius:14px; padding:18px 20px; margin-top:14px;}
+  .stateline{font-size:14.5px; margin-top:12px; min-height:24px; color:var(--ink); font-weight:600;}
+  .stateline .sub{font-weight:400; color:var(--ink2); font-size:13px;}
+
+  /* ===== bucket 分组容器 ===== */
+  .buckets{display:flex; gap:10px; margin-top:8px; flex-wrap:wrap;}
+  .bucket{border-radius:12px; padding:7px; transition:box-shadow .3s, transform .3s;}
+  .bucket .blab{font-size:10.5px; color:#8a93a6; text-align:center; margin-bottom:4px; font-weight:700;}
+  .bucket.ring{box-shadow:0 0 0 3px var(--gold); transform:translateY(-3px);}
+  .bg0{background:#e7f5ff;} .bg1{background:#ebfbee;} .bg2{background:#fff9db;} .bg3{background:#fff0f6;}
+  .bucket .cells{margin-top:0; gap:4px;}
+  .bucket .cell{width:34px; height:34px; font-size:11px;}
+
+  /* ===== HIP/Triton 范式对比图 ===== */
+  .paradigm{display:grid; grid-template-columns:1fr 1fr; gap:18px; margin-top:16px;}
+  @media (max-width:820px){.paradigm{grid-template-columns:1fr;}}
+  .panel{border-radius:16px; padding:20px; border:2px solid;}
+  .panel.hip{background:var(--hip-bg); border-color:#ffc078;}
+  .panel.tri{background:var(--tri-bg); border-color:#74c0fc;}
+  .panel h4{margin:0 0 4px; font-size:16.5px;}
+  .panel .tag{font-size:12px; font-weight:800; letter-spacing:1px;}
+  .panel.hip .tag{color:var(--hip-deep);} .panel.tri .tag{color:var(--tri-deep);}
+  .panel p{font-size:13.5px; color:#4a5468; margin-top:6px;}
+  .thread-dots{display:flex; flex-wrap:wrap; gap:7px; margin-top:12px;}
+  .tdot{
+    width:46px; height:46px; border-radius:10px; background:#fff; border:2px solid var(--hip);
+    display:flex; flex-direction:column; align-items:center; justify-content:center; font-size:11px; font-weight:700; color:var(--hip-deep);
+  }
+  .tdot small{font-size:9.5px; color:#9aa3b5; font-weight:400;}
+  .tdot.off{border-style:dashed; border-color:#c0c6d4; color:#adb5bd; background:#f4f5f9;}
+  .pbox{border:2px solid var(--tri); border-radius:12px; padding:8px 10px; margin-top:12px; background:#fff;}
+  .pbox .pt{font-size:12px; font-weight:800; color:var(--tri-deep); margin-bottom:6px;}
+  .pbox .cells{margin-top:0;}
+  .pbox .cell{width:32px; height:32px; font-size:11px;}
+
+  /* ===== 计算器 ===== */
+  .calc{display:flex; gap:14px; flex-wrap:wrap; align-items:flex-end; margin-top:12px;}
+  .calc label{font-size:13px; font-weight:700; color:var(--ink2); display:block; margin-bottom:5px;}
+  .calc input,.calc select{
+    font-family:inherit; font-size:15px; padding:8px 12px; border:1.5px solid #cfd4e0; border-radius:10px; width:130px; background:#fff;
+  }
+  .calc input:focus,.calc select:focus{outline:2px solid var(--hip); border-color:var(--hip);}
+  .calc-out{margin-top:14px; background:#fff; border:2px solid #ffd8a8; border-radius:12px; padding:13px 16px; font-size:14.5px;}
+  .calc-out code{font-family:"Cascadia Code",Consolas,monospace; color:var(--hip-deep); font-weight:700;}
+
+  /* ===== 柱状图 ===== */
+  .bars{margin-top:16px;}
+  .bar-row{display:grid; grid-template-columns:170px 1fr 150px; gap:10px; align-items:center; margin-bottom:9px; font-size:13px;}
+  @media (max-width:700px){.bar-row{grid-template-columns:110px 1fr 110px;}}
+  .bar-name{font-weight:700; text-align:right; color:var(--ink2); font-size:12.5px;}
+  .bar-track{background:#eceef3; border-radius:8px; height:24px; overflow:hidden;}
+  .bar-fill{height:100%; border-radius:8px; display:flex; align-items:center; justify-content:flex-end; padding-right:8px;
+            color:#fff; font-size:11.5px; font-weight:800; min-width:44px; transition:width 1s ease;}
+  .bar-val{font-size:12.5px; color:var(--ink2); font-variant-numeric:tabular-nums;}
+
+  /* ===== 负结果卡片 ===== */
+  .neg-grid{display:grid; grid-template-columns:1fr 1fr; gap:16px;}
+  @media (max-width:820px){.neg-grid{grid-template-columns:1fr;}}
+  .neg{border:1.5px solid #ffc2c2; background:var(--bad-bg); border-radius:14px; padding:16px 18px;}
+  .neg h4{margin:0 0 6px; color:var(--bad); font-size:15px;}
+  .neg p{font-size:13.5px; color:#5f4a4a;}
+
+  /* ===== 记忆卡片 ===== */
+  .memo-grid{display:grid; grid-template-columns:repeat(2,1fr); gap:14px;}
+  @media (max-width:820px){.memo-grid{grid-template-columns:1fr;}}
+  .memo{border-radius:14px; padding:15px 18px; font-size:14px; border:1.5px solid; position:relative;}
+  .memo .idx{position:absolute; top:-11px; left:14px; background:var(--ink); color:#fff; font-size:11px; font-weight:800;
+             padding:2px 10px; border-radius:10px;}
+  .memo.m1{border-color:#ffc078; background:var(--hip-bg);}
+  .memo.m2{border-color:#74c0fc; background:var(--tri-bg);}
+  .memo.m3{border-color:#b2f2bb; background:var(--ok-bg);}
+  .memo.m4{border-color:#ffe08a; background:var(--gold-bg);}
+  .memo.m5{border-color:#d0bfff; background:var(--violet-bg);}
+  .memo.m6{border-color:#fcc2d7; background:#fff0f6;}
+  .memo b{display:block; margin-bottom:4px;}
+
+  /* ===== 测验 ===== */
+  details{background:#fff; border:1px solid var(--line); border-radius:12px; margin-top:10px; padding:14px 18px;}
+  details summary{cursor:pointer; font-weight:700; font-size:15px;}
+  details p{margin-top:10px; color:var(--ink2); font-size:14.5px;}
+  details .ans{margin-top:10px; padding:10px 14px; border-radius:10px; background:var(--ok-bg); font-size:14px;}
+
+  footer{margin-top:70px; padding-top:24px; border-top:1px solid var(--line); color:var(--ink2); font-size:13.5px;}
+  footer a{color:var(--tri);}
+  .toc-mini{margin-top:14px; background:#fff; border:1px solid var(--line); border-radius:14px; padding:16px 20px;}
+  .toc-mini b{font-size:14px;}
+  .toc-mini ol{margin:8px 0 0 20px; font-size:14px; columns:2; column-gap:36px;}
+  @media (max-width:700px){.toc-mini ol{columns:1;}}
+  .toc-mini a{color:var(--ink); text-decoration:none; border-bottom:1px dotted #b9c0cf;}
+  .toc-mini a:hover{color:var(--hip);}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="in">
+    <a class="logo" href="index.html">Hello·GPU <b>第8章</b></a>
+    <nav>
+      <a href="index.html">🏠 教材首页</a>
+      <a href="part2.html">③ 算子篇 8-13</a>
+      <a href="#sec1">① 是什么</a>
+      <a href="#sec2">② 两种写法</a>
+      <a href="#sec3">③ 定规矩</a>
+      <a href="#sec4">④ 瓶颈</a>
+      <a href="#sec5">⑤ HIP</a>
+      <a href="#sec6">⑥ Triton</a>
+      <a href="#sec7">⑦ 实测</a>
+      <a href="#sec8">⑧ 总结</a>
+    </nav>
+  </div>
+</div>
+
+<div class="wrap" id="top">
+
+<!-- ================= HERO ================= -->
+<header class="hero">
+  <div class="kicker">HELLO GPU · PART 2 KERNELS · CHAPTER 8</div>
+  <h1>逐元素算子 Element-Wise:<br>一道 <em>Vector Add</em>,看懂 GPU 最基础的算子</h1>
+  <p>这一章只做一件小事:两个数组对应位置相加,得到第三个数组。但它会带我们看清两件大事——GPU 上<b>两种编程范式</b>(HIP 的线程思维、Triton 的分块思维),以及为什么这类算子的快慢<b>根本不取决于"算得多快",而取决于"数据搬得多快"</b>。</p>
+  <div class="chips">
+    <span class="chip orange">HIP · 线程级范式</span>
+    <span class="chip blue">Triton · 分块(tile)范式</span>
+    <span class="chip">RX 9070 XT 实测</span>
+    <span class="chip">合并访存 Coalescing</span>
+    <span class="chip">成本模型 12B : 1 FLOP</span>
+  </div>
+  <div class="oneline">💡 <b>本章一句话:</b>HIP 从"<b>一个线程拿到哪个下标</b>"出发;Triton 从"<b>一个 program 管哪一块下标</b>"出发。殊途同归——读了哪些地址、算了什么、写回哪里。</div>
+</header>
+
+<div class="toc-mini">
+  <b>📖 目录</b>
+  <ol>
+    <li><a href="#sec1">逐元素算子是什么——各干各的活</a></li>
+    <li><a href="#sec2">两种写法:HIP 一个人一件 vs Triton 一组一片</a></li>
+    <li><a href="#sec3">先定规矩:C[i] = A[i] + B[i] 的数学与裁判</a></li>
+    <li><a href="#sec4">瓶颈在哪:12 字节搬运 vs 1 次加法</a></li>
+    <li><a href="#sec5">HIP 四级台阶:v0 → v1 → v2 → v3</a></li>
+    <li><a href="#sec6">Triton 两条路:七行代码 + 一个参数</a></li>
+    <li><a href="#sec7">实测结果:谁最快?慢的那个慢在哪?</a></li>
+    <li><a href="#sec8">负结果的价值 + 迁移 + 总结 + 小测验</a></li>
+  </ol>
+</div>
+
+<!-- ================= SEC 1 ================= -->
+<section id="sec1" data-accent="gold">
+  <div class="sec-head"><div class="sec-num">1</div><h2>逐元素算子是什么?——"各干各的活"</h2></div>
+  <div class="sec-sub">判断标准只有一句话:算输出 C[i],只需要看输入同位置的 A[i] 和 B[i]。</div>
+
+  <div class="card">
+    <h3>🎯 一眼判断法</h3>
+    <p>拿到任何算子,先问一个问题:</p>
+    <div class="callout analogy">
+      <div class="tt">🗣️ 白话判断标准</div>
+      "<b>算输出第 i 个位置,我需要跟别的位置商量吗?</b>"<br>
+      不需要,各算各的 → <b>逐元素算子</b>(Element-Wise),GPU 最喜欢。<br>
+      需要开会(求和、求最大)→ 不是逐元素,那是后面章节的主角。
+    </div>
+    <p>最典型的例子就是本章主角 <b>Vector Add</b>:<code class="inline">C[i] = A[i] + B[i]</code>。第 0 号位置的结果只跟 A[0]、B[0] 有关,跟 A[5]、B[99] 毫无关系——所以 <b>所有位置可以同时、独立地开工</b>,这正是 GPU 成千上万个小核心最擅长的事。</p>
+  </div>
+
+  <div class="card">
+    <h3>▶️ 动画:每个位置独立干活,互不等待</h3>
+    <p class="muted">点"播放",看 A、B 的每一列怎么独立地汇成 C 的同一列。任何一列出问题,其他列完全不受影响。</p>
+    <div class="stage">
+      <div class="rowlab"><span class="dot a"></span>A(输入一)</div><div class="cells" id="depA"></div>
+      <div class="rowlab"><span class="dot b"></span>B(输入二)</div><div class="cells" id="depB"></div>
+      <div class="rowlab"><span class="dot c"></span>C(输出)</div><div class="cells" id="depC"></div>
+      <div class="stateline" id="depState">点"播放"开始</div>
+      <div class="btns">
+        <button class="btn orange" id="depPlayBtn" onclick="depPlay()">▶ 播放</button>
+        <button class="btn ghost" onclick="depStep()">单步 →</button>
+        <button class="btn ghost" onclick="depReset()">重置</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>👪 逐元素算子家族</h3>
+    <p>同一套路换个公式,就是另一个算子。这一章的所有结论,对整个家族通用:</p>
+    <table>
+      <tr><th>算子</th><th>公式</th><th>白话理解</th></tr>
+      <tr><td>Add / Sub / Mul / Div</td><td>C[i] = A[i] ±×÷ B[i]</td><td>两排队伍一一配对合并</td></tr>
+      <tr><td>ReLU</td><td>C[i] = max(A[i], 0)</td><td>负数全部清零,正数放行</td></tr>
+      <tr><td>Scale &amp; Bias</td><td>C[i] = a·A[i] + b</td><td>每件货统一放大再贴标签</td></tr>
+      <tr><td>Clamp(限幅)</td><td>C[i] = min(max(A[i], lo), hi)</td><td>把越界的数夹回安全区间</td></tr>
+    </table>
+    <div class="callout warn">
+      <div class="tt">🚫 这些不是逐元素(当心!)</div>
+      <b>求和 reduce</b>:C = A[0]+A[1]+…+A[n],输出只有一个数,要"全班一起算",位置之间有依赖。<br>
+      <b>Softmax</b>:每个输出都要先知道"这一行的最大值",得先开会、再干活。<br>
+      它们会在后面章节登场,手法完全不同。
+    </div>
+    <div class="callout analogy">
+      <div class="tt">🗣️ 白话:为什么 GPU 喜欢"各干各的"</div>
+      一条流水线上,如果每个工位的产品互不影响,那就可以<b>雇一万个工人同时开工</b>,人越多越快。反过来,如果每个环节都要等其他人的结果(像求和那样一层层汇报),人再多也快不起来——GPU 的并行优势,正是建立在"逐元素这种无依赖的活"之上的。
+    </div>
+  </div>
+</section>
+
+<!-- ================= SEC 2 ================= -->
+<section id="sec2" data-accent="tri">
+  <div class="sec-head"><div class="sec-num">2</div><h2>两种写法:HIP"一人一件" vs Triton"一组一片"</h2></div>
+  <div class="sec-sub">同一道题,两种世界观。先看全景,后面两节各走一条路。</div>
+
+  <div class="card">
+    <h3>🗺️ 全景对比(下面画的是 N=6 的小例子,实际启动覆盖到 0–7)</h3>
+    <div class="paradigm">
+      <div class="panel hip">
+        <span class="tag">HIP / CUDA 范式</span>
+        <h4>一个人,一件货</h4>
+        <p>每个线程像<b>单件工人</b>,只拿着一个标量下标 <code class="inline">i</code>,自己去 A、B 各取一件,加完放回 C 的 i 号位。程序眼里只有"我"。</p>
+        <div class="thread-dots">
+          <div class="tdot">T0<small>干 0</small></div>
+          <div class="tdot">T1<small>干 1</small></div>
+          <div class="tdot">T2<small>干 2</small></div>
+          <div class="tdot">T3<small>干 3</small></div>
+          <div class="tdot">T4<small>干 4</small></div>
+          <div class="tdot">T5<small>干 5</small></div>
+          <div class="tdot off">T6<small>没事做</small></div>
+          <div class="tdot off">T7<small>没事做</small></div>
+        </div>
+        <p style="margin-top:10px;">⚠️ 需要自己写 <code class="inline">if (i &lt; 6)</code> 关掉多出来的线程。</p>
+      </div>
+      <div class="panel tri">
+        <span class="tag">TRITON 范式</span>
+        <h4>一个组长,一整片货</h4>
+        <p>每个 program 像<b>小组长</b>,拿一张任务单(offsets),上面写着"你负责 4、5、6、7 这一片",整片一起装进寄存器算。程序眼里有"一块"。</p>
+        <div class="pbox">
+          <div class="pt">program 0 → 任务单 [0,1,2,3]</div>
+          <div class="cells">
+            <div class="cell valid">0</div><div class="cell valid">1</div><div class="cell valid">2</div><div class="cell valid">3</div>
+          </div>
+        </div>
+        <div class="pbox">
+          <div class="pt">program 1 → 任务单 [4,5,6,7]</div>
+          <div class="cells">
+            <div class="cell valid">4</div><div class="cell valid">5</div><div class="cell masked">6</div><div class="cell masked">7</div>
+          </div>
+        </div>
+        <p style="margin-top:10px;">⚠️ 越界的格子用 <code class="inline">mask</code> 挡住,而不是 if。</p>
+      </div>
+    </div>
+    <div class="callout warn">
+      <div class="tt">⚠️ 最容易混淆的一对概念</div>
+      HIP 的 <code class="inline">blockDim.x</code> = "每个车间雇多少工人";Triton 的 <code class="inline">BLOCK_SIZE</code> = "每张任务单写多少个格子"。名字里都有 block,但<b>完全不是一回事</b>——本章实测里,256 个线程/块 和 1024 格/单 是两种不同维度的选择。
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>🔁 概念翻译表</h3>
+    <table>
+      <tr><th>你想干的事</th><th>HIP 里的说法</th><th>Triton 里的说法</th></tr>
+      <tr><td>我是谁(拿到哪个下标)</td><td><code class="inline">blockIdx · blockDim · threadIdx</code> 三个数拼出一个标量</td><td><code class="inline">pid * BLOCK_SIZE + tl.arange(0, BLOCK_SIZE)</code> 直接得到一组下标</td></tr>
+      <tr><td>越界怎么办</td><td><code class="inline">if (index &lt; size)</code> 收工</td><td><code class="inline">mask = offsets &lt; n</code> 挡住</td></tr>
+      <tr><td>干活单位</td><td>1 个标量 float</td><td>1 个 tile(一整排格子,一起算)</td></tr>
+      <tr><td>写编译器的心智</td><td>你自己就是编译器:地址、向量化都要自己安排</td><td>编译器替你排:自动做向量化等优化</td></tr>
+    </table>
+    <div class="callout plain">
+      <div class="tt">📌 怎么选?</div>
+      想彻底搞懂<b>显存地址、访存合并</b>这些底层原理 → 走 HIP,每个数字都自己亲手拼出来(本章 ⑤ 节)。<br>
+      想快速写出能用的算子、把细节交给编译器 → 走 Triton,七行代码起步(本章 ⑥ 节)。<br>
+      本章两条路都走一遍,最后用同一把尺子(带宽)量出真相。
+    </div>
+  </div>
+</section>
+
+<!-- ================= SEC 3 ================= -->
+<section id="sec3" data-accent="green">
+  <div class="sec-head"><div class="sec-num">3</div><h2>先定规矩:C[i] = A[i] + B[i] 的数学与裁判</h2></div>
+  <div class="sec-sub">优化之前,先把"什么叫做对了"钉死。否则快了 10 倍,算错了,一切白搭。</div>
+
+  <div class="card">
+    <h3>✍️ 三条固定语义(一道题的"题干")</h3>
+    <table>
+      <tr><th>项目</th><th>本章的约定</th></tr>
+      <tr><td>数学定义</td><td><code class="inline">C[i] = A[i] + B[i]</code>,i ∈ [0, N),N = 16,777,216(2²⁴,约 1677 万个元素)</td></tr>
+      <tr><td>数值类型</td><td>FP32,float,连续存放在显存,不搞特殊布局</td></tr>
+      <tr><td>判定标准</td><td>和 PyTorch 参考实现逐元素对比,<b>最大绝对误差 max_abs_error = 0.0</b> 才算通过</td></tr>
+    </table>
+    <p>为什么要固定 FP32?因为加法本身在不同精度下可能得到不同结果。类型一变,"谁对谁错"就没法裁判了——所以先把类型钉死,后面所有版本都在同一张考卷上答题。</p>
+  </div>
+
+  <div class="card">
+    <h3>🧮 手算 5 秒,建立直觉</h3>
+    <div class="callout ok">
+      <div class="tt">举例(N=4)</div>
+      A = [2, −1, 4, 3]&nbsp;&nbsp;&nbsp;B = [7, 3, −1, 2]<br>
+      C[0]=2+7=<b>9</b>&nbsp;&nbsp;C[1]=−1+3=<b>2</b>&nbsp;&nbsp;C[2]=4+(−1)=<b>3</b>&nbsp;&nbsp;C[3]=3+2=<b>5</b><br>
+      → C = [<b>9, 2, 3, 5</b>]
+    </div>
+    <p>本章所有 7 个版本(4 个 HIP + 2 个 Triton + PyTorch 参考),都要先过这一关。</p>
+  </div>
+
+  <div class="card">
+    <h3>👨‍⚖️ 自动裁判:pre-check → 跑 kernel → post-check</h3>
+    <p class="muted">裁判流程固定三步:先检查输入是否符合预填数据 → 执行 kernel → 再检查输出与 PyTorch 的结果是否逐元素一致。两头一夹,谁也蒙混不过。</p>
+    <h4>为什么故意选一个"怪长度"?N = 1027</h4>
+    <p>N=1027 不是 256 的整数倍。启动 5 个车间、每车间 256 工人 = 1280 个线程,前 1027 个有活干,<b>后面 253 个线程空转</b>。这逼着每个版本都要回答同一个问题:"多出来的那批人,你打算怎么管?"</p>
+    <div class="callout analogy">
+      <div class="tt">🗣️ 白话</div>
+      就像 1027 个乘客上大巴,一辆坐 256 人,得开 5 辆车——第 5 辆只坐了 3 个人,剩下 253 个座位空着。空座不是 bug,<b>但要保证没人坐错位置、也没人被落下</b>。后面的 mask 和 if,干的就是这个事。
+    </div>
+  </div>
+</section>
+
+<!-- ================= SEC 4 ================= -->
+<section id="sec4" data-accent="gold">
+  <div class="sec-head"><div class="sec-num">4</div><h2>瓶颈在哪?12 字节搬运 vs 1 次加法</h2></div>
+  <div class="sec-sub">这是本章最重要的一页"账本"——先算账,再动手,猜出瓶颈,再用实验验证。</div>
+
+  <div class="card">
+    <h3>🧾 算一笔账</h3>
+    <p>每算一个元素,显存里要发生什么、计算单元要干什么?</p>
+    <table>
+      <tr><th>动作</th><th>去哪</th><th>搬多少</th></tr>
+      <tr><td>读 A[i]</td><td>显存 → 计算单元</td><td>4 字节(FP32)</td></tr>
+      <tr><td>读 B[i]</td><td>显存 → 计算单元</td><td>4 字节</td></tr>
+      <tr><td>写 C[i]</td><td>计算单元 → 显存</td><td>4 字节</td></tr>
+      <tr class="t-good"><td>合计</td><td>—</td><td><b>12 字节</b>,只换来 <b>1 次浮点加法(1 FLOP)</b></td></tr>
+    </table>
+    <p>这有点反直觉——你以为 GPU 在拼命"算",其实绝大多数时间在"搬"。<b>1 次加法对 12 字节搬运,吞吐上限被搬运一侧卡死。</b></p>
+    <div class="callout analogy">
+      <div class="tt">🗣️ 白话:螺丝厂</div>
+      一个工人每拧 1 颗螺丝(计算),就要去仓库取 2 个零件、送回 1 个成品(访存),来回要搬 12 斤。螺丝刀再快也没用——<b>工厂的产能卡在走廊和电梯上,而不是螺丝刀上</b>。这类"搬运为主、计算为辅"的活,叫<b>访存受限 / 带宽受限</b>(memory-bound)。
+    </div>
+    <div class="callout violet">
+      <div class="tt">📐 记两个数就够</div>
+      <b>算术强度</b> = 计算量 ÷ 访存量 = 1 FLOP ÷ 12 B ≈ <b>0.083 FLOP/Byte</b>。这个数越小,越说明是"搬运型"任务。<br>
+      由此可得实验里最常用的尺子:<b>有效带宽 = 12 × N ÷ 耗时</b>。版本跑得越快,这个数越接近显存的搬运极限,说明你把"走廊"用满了。
+    </div>
+    <div class="callout plain">
+      <div class="tt">🧪 科学态度:这只是假设</div>
+      "12B : 1FLOP ⇒ 带宽受限"目前只是<b>从数据量推出的假设</b>。它成立吗?要等 ⑤⑥⑦ 节的实测数据来检验——而且你会发现,唯一一个"假设成立"的强证据,恰恰来自那个最慢的版本(2.57 ms 的跨步版)。
+    </div>
+  </div>
+</section>
+
+<!-- ================= SEC 5 ================= -->
+<section id="sec5" data-accent="hip">
+  <div class="sec-head"><div class="sec-num">5</div><h2>HIP 四级台阶:v0 → v1 → v2 → v3</h2></div>
+  <div class="sec-sub">HIP 是 AMD GPU 上的底层编程接口(和 NVIDIA 的 CUDA 一个地位)。这条路上,每个数字都由你亲手拼出来。</div>
+
+  <!-- 5.0 对象 -->
+  <div class="card">
+    <h3>🧱 动手前,先认识 4 个对象</h3>
+    <div class="grid2">
+      <div class="callout plain">
+        <div class="tt">组织结构(从大到小)</div>
+        <b>Grid(全厂)</b> ← 由若干 <b>Block(车间)</b> 组成 ← 每个车间若干 <b>Thread(工人)</b>。<br>
+        每个工人手里有一块小小的私有寄存器,车间里有一块公共的共享内存(LDS)。
+      </div>
+      <div class="callout plain">
+        <div class="tt">Wavefront(小队)</div>
+        硬件真正调度的单位:<b>32 个工人一组,同进同出</b>。一个车间 256 人 = 8 支小队。后面"合并访存"的秘密,全在小队身上。
+      </div>
+    </div>
+    <div class="callout hip">
+      <div class="tt">🔢 本章实测的数字锚定(N = 2²⁴)</div>
+      N = <b>16,777,216</b> 个元素;每车间 <b>blockDim.x = 256</b> 人 → 需要 <b>grid = 65,536 个车间</b>(65,536 × 256 = 16,777,216,刚好铺满)。<br>
+      下标公式:<code class="inline">index = blockIdx.x × blockDim.x + threadIdx.x</code><br>
+      白话:你的全局工号 = <b>你在第几个车间</b> × 每车间人数 + <b>你是车间里第几号</b>。
+    </div>
+  </div>
+
+  <!-- v0 -->
+  <div class="card">
+    <h3>🪜 v0:一个线程,一个元素</h3>
+    <p>最直白的写法:启动 1677 万个工人,每人只负责一个下标。</p>
+    <div class="code">
+      <div class="cap"><span>hip_vector_add_v0.hip</span><span class="lang">HIP · C++</span></div>
+<pre><span class="k">__global__</span> <span class="k">void</span> <span class="f">vector_add</span>(<span class="k">const</span> <span class="t">float</span>* A, <span class="k">const</span> <span class="t">float</span>* B, <span class="t">float</span>* C, <span class="t">size_t</span> size) {
+  <span class="t">size_t</span> index = blockIdx.x * blockDim.x + threadIdx.x;  <span class="c">// 我的全局工号</span>
+  <span class="k">if</span> (index &lt; size) {                                    <span class="c">// 多出来的人,收工</span>
+    C[index] = A[index] + B[index];                      <span class="c">// 干自己的那一件</span>
+  }
+}</pre>
+    </div>
+    <h4>🧮 公式拆解 + 小计算器</h4>
+    <p class="muted">把三个数代进去玩玩,感受"工号是怎么拼出来的"。第三个下拉框专门模拟 N=1027 时"多出来的工人"。</p>
+    <div class="calc">
+      <div><label>blockIdx.x(第几个车间)</label><input type="number" id="cb" value="2" min="0"></div>
+      <div><label>threadIdx.x(车间内工号)</label><input type="number" id="ct" value="3" min="0" max="255"></div>
+      <div><label>N(总元素数,判越界用)</label>
+        <select id="cn">
+          <option value="16777216">16,777,216</option>
+          <option value="1027">1,027</option>
+          <option value="13">13</option>
+        </select>
+      </div>
+    </div>
+    <div class="calc-out" id="calcOut"></div>
+    <h4>🚗 顺带认识"访存合并 Coalescing"</h4>
+    <div class="callout hip">
+      <div class="tt">概念预告(下一级台阶的主角)</div>
+      小队(32 人)同一步要取的 32 个地址,<b>如果正好挤在同一小段连续显存里</b>,硬件可以像"一卡车拉走一整排货架"那样合并成很少几次大搬运——这叫<b>合并访存</b>。v0 里相邻线程的地址正好相邻(工号 0,1,2,3…),天然合并,这就是它不慢的原因。
+    </div>
+  </div>
+
+  <!-- v1 -->
+  <div class="card">
+    <h3>🪜 v1:一次改变世界的"地址顺序"实验 ⭐ 本章核心</h3>
+    <p>一个大胆的问题:<b>如果每个工人干的活不变,只改变"谁负责哪个下标"的顺序,耗时会变吗?</b></p>
+    <div class="callout plain">
+      <div class="tt">🧪 受控实验设计(控制变量,只动一处)</div>
+      只启动 <b>1 支小队(32 线程)</b>,每人往返 <b>32 趟</b>(每趟管 1 个元素)。同一个下标集合 0–1023,两种排列:<br>
+      ① <b>连续版</b>:<code class="inline">index = base + r × 32 + lane</code> —— 第 r 趟,0 号工人管第 r×32 个,1 号管下一个……<br>
+      ② <b>跨步版</b>:<code class="inline">index = base + lane × 32 + r</code> —— 0 号工人从头到尾管 0,32,64,…,1 号管 1,33,65,……<br>
+      除此之外<b>什么都不变</b>:同样的线程数、同样的 VGPR/SGPR 寄存器、同样的指令数(编译 trace 逐项相同)。
+    </div>
+    <div class="stage">
+      <h4 style="margin-top:0;">▶️ 动画:同一轮里,两种顺序的"取货路线"(8 人小队示意,每人 4 趟)</h4>
+      <p class="muted">货架按 <b>32 字节一组</b>分区(8 个 FP32 = 一组,开一次门)。小队每轮 8 人同时伸手——数一数每轮要开几扇门?</p>
+      <div style="display:flex; gap:14px; align-items:center; flex-wrap:wrap;">
+        <span style="font-weight:800; color:var(--hip-deep);">连续版</span>
+        <div class="buckets" id="coBucketsC"></div>
+      </div>
+      <div style="display:flex; gap:14px; align-items:center; flex-wrap:wrap; margin-top:16px;">
+        <span style="font-weight:800; color:var(--bad);">跨步版</span>
+        <div class="buckets" id="coBucketsS"></div>
+      </div>
+      <div class="stateline" id="coState">点"播放":逐轮点亮每个工人(lane)实际触碰的元素。</div>
+      <div class="btns">
+        <button class="btn orange" id="coPlayBtn" onclick="coPlay()">▶ 播放</button>
+        <button class="btn ghost" onclick="coReset()">重置</button>
+      </div>
+      <div class="stateline" id="coResult" style="display:none; background:#fff; border:1.5px solid var(--gold); border-radius:12px; padding:10px 14px; font-size:14px;"></div>
+    </div>
+    <div class="callout ok">
+      <div class="tt">📊 实测结果(RX 9070 XT)</div>
+      连续版 <b>0.3696 ms</b>(544.7 GB/s) vs 跨步版 <b>2.5672 ms</b>(78.4 GB/s)——<b>6.95 倍</b>的差距!而两版的编译 trace(线程数、寄存器、指令)完全一致。<br>
+      白话:两支队伍搬一样多的货,唯一区别是<b>取货路线</b>。连续队一次拉满一车;跨步队每轮都绕 4 个货架各拿一点,卡车永远装不满。
+    </div>
+    <div class="callout gold">
+      <div class="tt">⚖️ 这一节教会我们的方法论</div>
+      <b>控制变量 + 时间差同时出现</b>,才敢说因果。6.95 倍的耗时差,和"唯一变量=地址顺序"绑在一起,才能断定:合并访存就是这类算子的命门。这也是全章成本模型假设最硬的一块证据。
+    </div>
+  </div>
+
+  <!-- v2 -->
+  <div class="card">
+    <h3>🪜 v2:Grid-Stride——少雇点人,每人多跑几趟</h3>
+    <p>v0 需要 65,536 个车间才能铺满 1677 万元素。另一种思路:<b>只开少量车间,让每个工人来回跑很多趟</b>。</p>
+    <div class="code">
+      <div class="cap"><span>hip_vector_add_v2.hip(核心循环)</span><span class="lang">HIP · C++</span></div>
+<pre><span class="k">__global__</span> <span class="k">void</span> <span class="f">vector_add_grid_stride</span>(<span class="t">float</span>* A, <span class="t">float</span>* B, <span class="t">float</span>* C, <span class="t">size_t</span> n) {
+  <span class="t">size_t</span> index  = blockIdx.x * blockDim.x + threadIdx.x;   <span class="c">// 工号</span>
+  <span class="t">size_t</span> stride = gridDim.x * blockDim.x;                  <span class="c">// 全体工人的总数 = 一趟的步长</span>
+  <span class="k">for</span> (<span class="t">size_t</span> i = index; i &lt; n; i += stride) {             <span class="c">// 跑完一趟,跨一整步再来</span>
+    C[i] = A[i] + B[i];
+  }
+}</pre>
+    </div>
+    <div class="grid2">
+      <div class="callout plain">
+        <div class="tt">步长是什么?</div>
+        全厂一共 stride 个工人。0 号工人干完 i=0,下一趟跳去干 i=stride,再下一趟 i=2×stride……<br>
+        只要步长 = 工人总数,<b>所有工人拼起来恰好无缝覆盖全部下标</b>,不多不少。
+      </div>
+      <div class="callout plain">
+        <div class="tt">grid 开多大?默认 CU × 8</div>
+        本章默认 grid = <b>计算单元(CU)数 × 8</b>。直觉:每个 CU 是一个"食堂",×8 是给调度器留的余量,让每个 CU 手里始终有活排队。
+      </div>
+    </div>
+    <div class="callout ok">
+      <div class="tt">📊 实测:0.3435 ms —— 和 v0 的 0.3363 ms 基本打平</div>
+      对这类"逐元素"任务,只要<b>访存模式保持合并</b>,v0 那种"人海战术"和 v2 这种"少人多趟"没有本质区别。Grid-Stride 的真正价值在后面章节(比如配合共享内存的算子)才会显现,这里先当"认识它"。
+    </div>
+  </div>
+
+  <!-- v3 -->
+  <div class="card">
+    <h3>🪜 v3:float4——一次搬 4 个 + 尾部处理</h3>
+    <p>既然瓶颈在搬运,那就<b>把手推车换大</b>:让每个工人一次操作 4 个连续的 float,挤成一个 <code class="inline">float4</code> 类型(4×4=16 字节)。</p>
+    <div class="stage">
+      <h4 style="margin-top:0;">📦 N=18 时的分组示意</h4>
+      <div class="buckets" id="f4buckets"></div>
+      <div class="stateline"><span class="sub">🟩 4 组 float4(0–15)由向量化主干处理;🟨 剩下 16、17 两个"散货"走标量尾部。注意 8–11 这组虽然凑齐 4 个,但起始地址 8×4=32 字节,恰好对齐,没问题——<b>对齐检查看的是起始地址是不是 16 字节的整数倍</b>。</span></div>
+    </div>
+    <div class="code">
+      <div class="cap"><span>hip_vector_add_v3.hip(主干)</span><span class="lang">HIP · C++</span></div>
+<pre><span class="k">__global__</span> <span class="k">void</span> <span class="f">vector_add_float4</span>(<span class="t">float</span>* A, <span class="t">float</span>* B, <span class="t">float</span>* C, <span class="t">size_t</span> n) {
+  <span class="t">size_t</span> v4      = n / 4;                    <span class="c">// 能凑成几整组 float4</span>
+  <span class="t">size_t</span> tail    = n % 4;                    <span class="c">// 剩下几个散货</span>
+  <span class="t">size_t</span> nvec    = v4 * 4;                   <span class="c">// 向量化主干管到的边界</span>
+
+  <span class="k">const</span> <span class="t">float4</span>* A4 = <span class="k">reinterpret_cast</span>&lt;<span class="k">const</span> <span class="t">float4</span>*&gt;(A);  <span class="c">// 把 float 数组"看成"float4 数组</span>
+  <span class="k">const</span> <span class="t">float4</span>* B4 = <span class="k">reinterpret_cast</span>&lt;<span class="k">const</span> <span class="t">float4</span>*&gt;(B);
+  <span class="t">float4</span>*       C4 = <span class="k">reinterpret_cast</span>&lt;<span class="t">float4</span>*&gt;(C);
+
+  <span class="t">size_t</span> i = blockIdx.x * blockDim.x + threadIdx.x;
+  <span class="t">size_t</span> stride = gridDim.x * blockDim.x;
+  <span class="k">for</span> (<span class="t">size_t</span> k = i; k &lt; v4; k += stride) {          <span class="c">// 主干:一次一整车</span>
+    <span class="t">float4</span> a = A4[k], b = B4[k];
+    C4[k] = <span class="k">make_float4</span>(a.x + b.x, a.y + b.y, a.z + b.z, a.w + b.w);
+  }
+  <span class="t">size_t</span> base = i;                                    <span class="c">// 尾部:前 4 个工人各领一件散货</span>
+  <span class="k">if</span> (base &lt; tail)  C[nvec + base] = A[nvec + base] + B[nvec + base];
+}</pre>
+    </div>
+    <div class="callout warn">
+      <div class="tt">⚠️ 三个最容易搞混的事实</div>
+      <b>① <code class="inline">reinterpret_cast</code> 不搬数据</b>——它只换一副"眼镜",告诉编译器:请把这段内存按 float4 的格式重新解读,数据一个字节都没动。<br>
+      <b>② 一次 float4 load ≠ 一次访存指令</b>——硬件可能把它拆成多条访存指令,所以"源码里写 4 个"不等于"显存里 1 次事务",向量化收益要看硬件实际怎么发指令。<br>
+      <b>③ 对齐检查看的是"起始地址"而不是"数组够不够 4 个"</b>——起始地址必须是 16 字节(4×float)的整数倍,凑齐 4 个元素但起始地址歪了,照样不能安全地按 float4 读。
+    </div>
+    <div class="callout ok">
+      <div class="tt">📊 实测:0.3452 ms —— 没有变快</div>
+      为什么?因为 v0/v2 里相邻线程的地址本来就连成一片,硬件早就把访存合并得很好了;再换大车,走廊还是那条走廊。<b>"向量化"不是万金油,合并访存才是本命。</b>这个"没变快"本身,就是一个有价值的负结果(见 ⑧ 节)。
+    </div>
+  </div>
+
+  <div class="callout hip">
+    <div class="tt">🪜 HIP 台阶小结:每一级只动了一处</div>
+    <b>v0</b> 打地基:一人一件 + 合并访存。<b>v1</b> 只改"谁负责哪个下标" → 6.95 倍差距,合并访存实锤。<br>
+    <b>v2</b> 改组织方式(grid 大小 + 每人工作量) → 打平。<b>v3</b> 换数据类型(float4 + 尾部) → 打平。<br>
+    一步步做实验,每一步只有一个变量——这就是性能工程的基本功。
+  </div>
+</section>
+
+<!-- ================= SEC 6 ================= -->
+<section id="sec6" data-accent="tri">
+  <div class="sec-head"><div class="sec-num">6</div><h2>Triton 两条路:七行代码 + 一个参数</h2></div>
+  <div class="sec-sub">Triton 是 OpenAI 出的 Python 算子语言:你描述"一片怎么算",寄存器分配、向量化这些脏活它替你干。</div>
+
+  <div class="card">
+    <h3>🐍 kernel 正文:真的只有 7 行</h3>
+    <div class="code">
+      <div class="cap"><span>triton_vector_add.py</span><span class="lang">Python · Triton</span></div>
+<pre><span class="k">@triton.jit</span>
+<span class="k">def</span> <span class="f">add_kernel</span>(x_ptr, y_ptr, out_ptr, n_elements, BLOCK_SIZE: <span class="t">tl.constexpr</span>):
+    pid = <span class="f">tl.program_id</span>(<span class="n">0</span>)                                   <span class="c"># 我是几号小组长</span>
+    offsets = pid * BLOCK_SIZE + <span class="f">tl.arange</span>(<span class="n">0</span>, BLOCK_SIZE)      <span class="c"># 我这张任务单:一整排下标</span>
+    mask = offsets &lt; n_elements                               <span class="c"># 单子上哪些格子真的存在</span>
+    x = <span class="f">tl.load</span>(x_ptr + offsets, mask=mask)                    <span class="c"># 按单子整片装货(挡住越界)</span>
+    y = <span class="f">tl.load</span>(y_ptr + offsets, mask=mask)
+    <span class="f">tl.store</span>(out_ptr + offsets, x + y, mask=mask)              <span class="c"># 整片写回</span></pre>
+    </div>
+    <div class="grid2">
+      <div class="callout tri">
+        <div class="tt">🧩 逐行白话</div>
+        <b>pid</b>:组长编号(相当于 HIP 的 blockIdx)。<br>
+        <b>offsets</b>:注意!它<b>不是单个整数,是一整排数</b>——像"任务单"。<br>
+        <b>mask</b>:布尔排,哪些格子真实存在。<br>
+        <b>tl.load / tl.store</b>:按任务单整片装卸,越界格子被 mask 挡住,不会出错。
+      </div>
+      <div class="callout tri">
+        <div class="tt">🏠 宿主(host)代码:Python 一侧</div>
+        <div class="code" style="margin-top:0;">
+<pre>grid = (triton.<span class="f">cdiv</span>(n, BLOCK_SIZE),)          <span class="c"># 需要几个小组长 = 向上取整</span>
+add_kernel[grid](a, b, out, n,
+                 BLOCK_SIZE=<span class="n">256</span>, num_warps=<span class="n">4</span>)</pre>
+        </div>
+        <code class="inline">cdiv(n, BLOCK)</code> = (n + BLOCK − 1) // BLOCK,N=1027、BLOCK=256 时 = 5 个组长,和 HIP 的 5 个车间一个道理。特别提示:在 ROCm 上跑,照常写 <code class="inline">torch.cuda</code> 即可,ROCm 会翻译成 HIP。
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>🎬 可视化:N=13,BLOCK_SIZE=8,mask 在干什么</h3>
+    <p class="muted">这正是官方 Triton-viz 工具展示的例子。点下面的按钮切换小组长,看"任务单"上哪些格子放行(绿)、哪些被 mask 拦下(灰)。</p>
+    <div class="stage">
+      <div class="btns" style="margin-top:0;">
+        <button class="btn blue" id="tpBtn0" onclick="tpShow(0)">program 0</button>
+        <button class="btn ghost" id="tpBtn1" onclick="tpShow(1)">program 1</button>
+      </div>
+      <div class="stateline" id="tpFormula" style="font-family:Consolas,monospace;"></div>
+      <div class="buckets" id="tpBuckets"></div>
+      <div class="stateline" id="tpState"></div>
+    </div>
+    <div class="callout analogy">
+      <div class="tt">🗣️ 白话:mask 就是"关门"</div>
+      任务单是按固定大小(8 格)印的,N=13 凑不满最后一张单。后 3 个格子指向不存在的 A[13..15]——硬件不可能真的去读,所以编译器让这些格子<b>整个通道失效</b>,像商场关门那样,谁也进不去。对比 HIP:那边是给每个线程发"if 不通过就收工"的指令,这边是"任务单上直接划掉",思路不同,目的一样。
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>🎛️ t0 → t1:只改一个参数 BLOCK_SIZE</h3>
+    <table>
+      <tr><th>版本</th><th>BLOCK_SIZE(任务单大小)</th><th>num_warps(组长手下小队数)</th><th>耗时</th><th>VGPR 寄存器</th></tr>
+      <tr class="t-tri"><td>t0</td><td class="num">256</td><td>4</td><td class="num">0.3362 ms</td><td class="num">8</td></tr>
+      <tr class="t-tri"><td>t1</td><td class="num">1024</td><td>4</td><td class="num">0.3385 ms</td><td class="num">24 ↑</td></tr>
+    </table>
+    <div class="callout tri">
+      <div class="tt">💡 BLOCK_SIZE 调大的得与失</div>
+      单子大了,一次管的数据多,<b>但要在寄存器里囤更多货</b>:VGPR 从 8 涨到 24。这里没变快,是因为瓶颈根本不在"单子大小",而在显存搬运——单子再大,卡车还是那几辆。<br>
+      另外记住:<b>BLOCK_SIZE 必须是 2 的幂</b>(硬件和编译器的约定),256、1024 都合法,100 不行。
+    </div>
+    <div class="callout plain">
+      <div class="tt">🔍 Triton-viz:官方可视化工具</div>
+      原文用 <b>triton-viz</b> 工具直观展示了上面的 mask 拦截过程(能逐 program 看到哪些格子被挡)。本页的"program 0 / program 1"小部件就是它的手动复刻版,想看原图请回原文档。
+    </div>
+  </div>
+</section>
+
+<!-- ================= SEC 7 ================= -->
+<section id="sec7" data-accent="gold">
+  <div class="sec-head"><div class="sec-num">7</div><h2>实测结果:谁最快?慢的那个慢在哪?</h2></div>
+  <div class="sec-sub">同一块卡(RX 9070 XT)、同一道题、七份答卷。先看成绩单,再看怎么解读。</div>
+
+  <div class="card">
+    <h3>✅ 成绩单(全部通过正确性检验,max_abs_error = 0.0)</h3>
+    <table>
+      <tr><th>版本</th><th>一句话特点</th><th>耗时 (ms)</th><th>有效带宽 (GB/s)</th></tr>
+      <tr class="t-tri"><td>triton-t0</td><td>BLOCK=256,七行起步</td><td class="num">0.3362</td><td class="num"><b>598.8</b></td></tr>
+      <tr class="t-hip"><td>hip-v0</td><td>一人一件,合并访存</td><td class="num">0.3363</td><td class="num"><b>598.6</b></td></tr>
+      <tr class="t-tri"><td>triton-t1</td><td>BLOCK=1024,VGPR↑</td><td class="num">0.3385</td><td class="num">594.8</td></tr>
+      <tr class="t-hip"><td>hip-v2</td><td>grid-stride,少人多趟</td><td class="num">0.3435</td><td class="num">586.1</td></tr>
+      <tr class="t-hip"><td>hip-v3</td><td>float4 + 标量尾部</td><td class="num">0.3452</td><td class="num">583.2</td></tr>
+      <tr class="t-hip"><td>hip-v1 连续</td><td>单小队,连续取货</td><td class="num">0.3696</td><td class="num">544.7</td></tr>
+      <tr class="t-bad"><td>hip-v1 跨步</td><td><b>唯一改了地址顺序</b></td><td class="num"><b>2.5672</b></td><td class="num"><b>78.4</b></td></tr>
+    </table>
+  </div>
+
+  <div class="card">
+    <h3>📊 有效带宽一目了然(GB/s,越高越好)</h3>
+    <div class="bars" id="bwBars"></div>
+    <p class="muted" style="margin-top:12px;">注意:这里画的是<b>逻辑有效带宽</b>(12N ÷ 耗时),不是物理显存流量。五个"访问连续"的版本挤在 545–600 GB/s 一带,瓶颈已顶到显存搬运能力附近——与 ④ 节的假设一致。</p>
+    <div class="callout ok">
+      <div class="tt">🔑 三句解读</div>
+      <b>① HIP 和 Triton 打平了。</b>同样的合并访存下,一个手写 10 行、一个 Python 7 行,成绩几乎一模一样——范式不同,本质相同:读了哪些地址、算了什么、写回哪里。<br>
+      <b>② 唯一的"异常值"是跨步版。</b>6.95 倍的差距,直接验证了成本模型:瓶颈真的在搬运,不在计算。<br>
+      <b>③ 后面的优化(v2/v3/t1)全部无效。</b>因为访存已经是合并的、瓶颈已经顶到带宽上限,再怎么折腾"计算侧"都无济于事。
+    </div>
+  </div>
+</section>
+
+<!-- ================= SEC 8 ================= -->
+<section id="sec8" data-accent="green">
+  <div class="sec-head"><div class="sec-num">8</div><h2>负结果的价值 · 迁移 · 总结 · 小测验</h2></div>
+  <div class="sec-sub">"试了但没用"的实验,和"成功了"的实验一样值钱——前提是记录下来。</div>
+
+  <div class="card">
+    <h3>🗂️ 本章的四张"负结果"卡</h3>
+    <div class="neg-grid">
+      <div class="neg"><h4>❌ 跨步版慢 6.95 倍</h4><p>只改地址顺序,耗时 0.37 → 2.57 ms。负结果反手变成了<b>最重要的正面证据</b>:合并访存就是命门。</p></div>
+      <div class="neg"><h4>❌ Grid-Stride 没有更快</h4><p>0.3435 vs 0.3363 ms,基本打平。教训:对纯逐元素任务,"少人多趟"不省时间;它的用武之地在别的算子。</p></div>
+      <div class="neg"><h4>❌ float4 没有更快</h4><p>0.3452 ms。教训:源码向量化 ≠ 实际提速;访存已合并时,换大车只添麻烦(还要处理尾部)。</p></div>
+      <div class="neg"><h4>❌ BLOCK_SIZE 调到 1024 没有更快</h4><p>0.3385 ms,VGPR 反而从 8 涨到 24。教训:调参要看瓶颈在哪——瓶颈在带宽时,加大 tile 只多占寄存器。</p></div>
+    </div>
+    <div class="callout gold">
+      <div class="tt">📌 负结果的适用边界</div>
+      这些"没用"只是<b>在"逐元素 + 合并访存 + 这块卡"的条件下没用</b>。换一个算子(比如需要数据复用的卷积)、换一块卡(寄存器更紧张),同样的技巧可能立刻见效。做实验,永远把条件一起记录。
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>🚚 学会就迁移:这套打法直接抄到别的算子</h3>
+    <div class="grid2">
+      <div class="callout plain">
+        <div class="tt">ReLU</div>
+        把"<b>读 B</b>"整个砍掉,只读 A:<code class="inline">C[i] = max(A[i], 0)</code>。访存量 12B → 8B,账本更倾斜于搬运,套路不变:保证 A 的访问连续。
+      </div>
+      <div class="callout plain">
+        <div class="tt">Scale &amp; Bias</div>
+        <code class="inline">C[i] = a·A[i] + b</code>:只有 A 是数组,B 换成两个标量参数(不占 4B/元素的搬运),访存 12B → 8B。架构完全照抄 Vector Add。
+      </div>
+    </div>
+    <div class="callout tri">
+      <div class="tt">🔥 进阶:算子融合(Fusion)</div>
+      既然瓶颈是"把数据从显存搬来搬去",最狠的优化就是<b>少搬几趟</b>:把 add 和 relu 融合进一个 kernel,先加完立刻判 max,中间结果留在寄存器里,不给它回显存的机会——省下一次完整的"写 C 再读 C"。
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>🧠 记忆卡片(考前速记)</h3>
+    <div class="memo-grid">
+      <div class="memo m1"><span class="idx">1 · 判断</span><b>逐元素 = 各干各的</b>算 C[i] 只需 A[i]、B[i],无依赖 → GPU 并行的天堂。求和/softmax 要"开会",不是逐元素。</div>
+      <div class="memo m2"><span class="idx">2 · 范式</span><b>HIP 想下标,Triton 想任务单</b>blockIdx·threadIdx 拼出一个标量 vs pid×BLOCK+arange 得到一排下标;if 关门 vs mask 挡格子。</div>
+      <div class="memo m3"><span class="idx">3 · 账本</span><b>12B : 1 FLOP</b>4+4+4 字节换 1 次加法,算术强度 ≈0.083 → 访存受限。有效带宽 = 12N ÷ 耗时。</div>
+      <div class="memo m4"><span class="idx">4 · 命门</span><b>合并访存</b>同一轮 32 个地址挤在同一小段连续显存,才能"一卡车拉满"。6.95 倍的实验证明它是唯一命门。</div>
+      <div class="memo m5"><span class="idx">5 · 边界</span><b>怪长度 N=1027</b>多出来的线程/格子要管好:HIP 用 if(size),Triton 用 mask。谁也不能读越界、谁也不能被落下。</div>
+      <div class="memo m6"><span class="idx">6 · 方法</span><b>控制变量 + 记录负结果</b>每次只改一处;trace 相同才有因果;"没变快"也是数据,标注适用条件后它就是别人的路标。</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>📝 小测验(点开看答案)</h3>
+    <details>
+      <summary>Q1:为什么说 Vector Add 几乎注定是"带宽受限"?</summary>
+      <div class="ans">每个元素要搬 12 字节(读 A 4B + 读 B 4B + 写 C 4B),却只产生 1 次加法。算术强度 1/12 ≈ 0.083 FLOP/Byte,远低于 GPU 的平衡点,所以吞吐上限卡在显存带宽上——后来的 6.95 倍实验和 598 GB/s 的实测都印证了这一点。</div>
+    </details>
+    <details>
+      <summary>Q2:v1 实验里,连续版和跨步版的唯一区别是什么?为什么这样设计?</summary>
+      <div class="ans">唯一区别是<b>同一轮内 lane→地址的排列</b>(index = base + r×32 + lane vs base + lane×32 + r)。线程数、寄存器、指令数(编译 trace)完全相同。只有把其他变量全部钉死,6.95 倍的时间差才能干净地归因给"地址顺序→合并访存"这一个因素。</div>
+    </details>
+    <details>
+      <summary>Q3:N=13、BLOCK_SIZE=8 时,第二个 program 的 mask 会拦下哪些格子?</summary>
+      <div class="ans">offsets = 1×8 + [0..7] = [8..15];mask = offsets &lt; 13,所以 8–12 放行(5 个),<b>13、14、15 被拦下</b>(3 个)。cdiv(13,8)=2 个 program,正好覆盖全部 13 个真实元素。</div>
+    </details>
+    <details>
+      <summary>Q4:hip-v3 的 float4 没有变快,这算失败吗?说明了什么?</summary>
+      <div class="ans">不算失败,是一个有价值的<b>负结果</b>:它说明在访存已经合并、瓶颈已顶到带宽上限时,"源码级向量化"带不来额外收益(硬件可能本就把相邻 float 的访存合并成大事务)。同时提醒:reinterpret_cast 不搬数据、float4 load 可能拆成多条指令、对齐看起始地址。</div>
+    </details>
+  </div>
+
+  <div class="card">
+    <h3>💪 练一练(原文的课后题)</h3>
+    <ol style="margin-left:20px; margin-top:8px;">
+      <li>把本章的两个 HIP kernel 和两个 Triton kernel <b>亲手敲一遍</b>,在 ROCm 环境跑通,并复现对照表。</li>
+      <li>用 <b>triton-viz</b> 可视化你的 Vector Add,亲眼看看 mask 是怎么拦下越界格子的。</li>
+      <li>把 v0 和 t0 各自<b>故意写错</b>一种访存模式(跨步、非对齐),复现性能塌方,记录数据。</li>
+      <li>把 add 改成 relu、scale&amp;bias,以及<b>add+relu 融合</b>,各写一个版本,观察融合带来的收益。</li>
+    </ol>
+    <div class="callout ok">
+      <div class="tt">✅ 验收信号(做到这些,本章就算毕业)</div>
+      ① 能用 12N/t 独立算出任何一版的带宽;② 能徒手画出 v1 两种地址顺序的示意并解释 6.95 倍;③ 能徒手画出 Triton offsets/mask 的分组;④ 能向别人讲清 reinterpret_cast、对齐、float4 load≠单次访存这三件事。
+    </div>
+  </div>
+
+  <div class="card" style="background:linear-gradient(120deg,#fff9db,#fff4e6); border-color:#ffe08a;">
+    <h3>🌅 下一章预告</h3>
+    <p>逐元素算子是"各干各的",但真实世界大量计算需要位置之间<b>协作</b>——求和、求最大、平均……那是 Reduce(归约)的世界:工人之间要开始"开会"了,挑战完全不同。</p>
+  </div>
+</section>
+
+<footer>
+  <p>📖 内容整理自:<a href="https://github.com/datawhalechina/hello-gpu/blob/dev/docs/part2-kernels/chapter8/index.md" target="_blank">Hello GPU 第8章 Element-Wise:逐元素算子(datawhalechina/hello-gpu · dev 分支)</a></p>
+  <p>⭐ 推荐延伸阅读:同仓库 <b>ch07 Kernel 结构</b>(本章的 4 对象与 launch 机制)、<b>ch09 Reduce 归约</b>(下一站)、Triton 官方教程与 triton-viz 工具。</p>
+  <p class="muted" style="margin-top:8px;">本页为学习用途的白话重述 + 交互示意图,数据均引自原文实测(RX 9070 XT · ROCm 7.13 · Ubuntu 24.04);如与原文有出入,以原文为准。</p>
+</footer>
+
+</div>
+
+<script>
+/* ================= 公共工具 ================= */
+function $(id){ return document.getElementById(id); }
+
+/* ================= §1 依赖动画 ================= */
+const DEP_N = 6;
+function depInit(){
+  for(const row of ["depA","depB","depC"]){
+    const box = $(row);
+    for(let i=0;i<DEP_N;i++){
+      const d = document.createElement("div");
+      d.className = "cell";
+      d.textContent = (row==="depA"?"A":row==="depB"?"B":"C")+"["+i+"]";
+      box.appendChild(d);
+    }
+  }
+}
+let depI = -1, depTimer = null;
+function depClear(){
+  ["depA","depB","depC"].forEach(r=>{
+    $(r).querySelectorAll(".cell").forEach(c=>c.classList.remove("on-a","on-b","on-c"));
+  });
+}
+function depStep(){
+  depI++;
+  if(depI >= DEP_N){ depStop(); $("depState").innerHTML = "🎉 播放完毕:每一步都只用同位置的 A、B 算出 C,与其他位置<b>零交流</b>。这就是 GPU 能万人同时开工的原因。"; depI = DEP_N-1; return; }
+  depClear();
+  $("depA").children[depI].classList.add("on-a");
+  $("depB").children[depI].classList.add("on-b");
+  $("depC").children[depI].classList.add("on-c");
+  $("depState").innerHTML = "第 <b>"+depI+"</b> 步:C["+depI+"] = A["+depI+"] + B["+depI+"] <span class='sub'>—— 只看自己这一列,别人干完干不完与我无关</span>";
+}
+function depStop(){ if(depTimer){ clearInterval(depTimer); depTimer=null; } $("depPlayBtn").textContent="▶ 播放"; }
+function depPlay(){
+  if(depTimer){ depStop(); return; }
+  depReset(); $("depPlayBtn").textContent="⏸ 暂停";
+  depTimer = setInterval(()=>{ if(depI>=DEP_N-1){ depStop(); depStep(); } else depStep(); }, 850);
+}
+function depReset(){ depStop(); depI=-1; depClear(); $("depState").textContent="点“播放”开始"; }
+
+/* ================= §2 无 JS,静态图 ================= */
+
+/* ================= §5 HIP index 计算器 ================= */
+function hipCalc(){
+  const b = parseInt($("cb").value)||0;
+  const t = parseInt($("ct").value)||0;
+  const n = parseInt($("cn").value);
+  const idx = b*256 + t;
+  let msg;
+  if(idx < n){
+    msg = "index = "+b+" × 256 + "+t+" = <code>"+idx+"</code> → ✅ 有效:这个线程负责 <code>C["+idx+"]</code>,去读 A["+idx+"] 和 B["+idx+"],加完写回。";
+  }else{
+    msg = "index = "+b+" × 256 + "+t+" = <code>"+idx+"</code> → ❌ 越界(≥ N="+n.toLocaleString()+"):<code>if (index &lt; size)</code> 不通过,这个线程<b>直接收工,什么都不做</b>。空转不干活,但绝不能读越界地址。";
+  }
+  $("calcOut").innerHTML = msg;
+}
+["cb","ct","cn"].forEach(id=>{ $(id).addEventListener("input", hipCalc); });
+
+/* ================= §5 v1 合并访存动画 ================= */
+/* 32 元素 = 4 组 × 8 个(32B/组);8 lanes × 4 rounds
+   连续: idx = r*8 + lane   → 每轮 1 组
+   跨步: idx = lane*4 + r   → 每轮 4 组   */
+const CO_L = 8, CO_R = 4;
+function coBuild(containerId){
+  const box = $(containerId); box.innerHTML="";
+  for(let b=0;b<4;b++){
+    const bk = document.createElement("div");
+    bk.className = "bucket bg"+b;
+    bk.innerHTML = "<div class='blab'>32B 组 "+b+"</div><div class='cells'></div>";
+    const cells = bk.querySelector(".cells");
+    for(let i=0;i<8;i++){
+      const c = document.createElement("div");
+      c.className="cell"; c.textContent = (b*8+i);
+      cells.appendChild(c);
+    }
+    box.appendChild(bk);
+  }
+}
+function coIdx(contiguous, r, lane){ return contiguous ? r*CO_L + lane : lane*CO_R + r; }
+function coDraw(contiguous, r){
+  const boxId = contiguous ? "coBucketsC" : "coBucketsS";
+  const box = $(boxId);
+  box.querySelectorAll(".bucket").forEach(bk=>bk.classList.remove("ring"));
+  let bi=0;
+  box.querySelectorAll(".bucket").forEach(bk=>{
+    bk.querySelectorAll(".cell").forEach((c,ci)=>{ c.classList.remove("on-a"); c.textContent = bi*8+ci; });
+    bi++;
+  });
+  let touched = new Set();
+  for(let lane=0; lane<CO_L; lane++){
+    const idx = coIdx(contiguous, r, lane);
+    const bucket = Math.floor(idx/8);
+    const cell = box.children[bucket].querySelector(".cells").children[idx%8];
+    cell.classList.add("on-a");
+    cell.innerHTML = idx + "<span class='lane'>L"+lane+"</span>";
+    touched.add(bucket);
+    box.children[bucket].classList.add("ring");
+  }
+  return touched;
+}
+let coR = -1, coTimer = null, coCumC = 0, coCumS = 0;
+function coStep(){
+  coR++;
+  if(coR >= CO_R){ coStop();
+    $("coState").innerHTML = "✅ 4 轮播完:两边都<b>恰好覆盖 0–31,无重复、无遗漏</b>——干的活一模一样,差的只是取货路线。";
+    $("coResult").style.display="block";
+    $("coResult").innerHTML = "📈 对照实测:连续版 <b>0.3696 ms</b>(544.7 GB/s)vs 跨步版 <b>2.5672 ms</b>(78.4 GB/s),差 <b>6.95 倍</b>。门开得越多,卡车越装不满,显存搬运就越浪费。";
+    return; }
+  const tc = coDraw(true, coR), ts = coDraw(false, coR);
+  coCumC += tc.size; coCumS += ts.size;
+  $("coState").innerHTML = "第 <b>"+coR+"</b> 轮(8 个 lane 同时伸手):连续版敲了 <b>"+tc.size+"</b> 组货架的门(累计 "+coCumC+"),跨步版敲了 <b>"+ts.size+"</b> 组(累计 "+coCumS+")。<span class='sub'>带颜色描边 = 这轮被触碰的 32B 组;格子里的 L0–L7 = 是哪个 lane 在读它。</span>";
+}
+function coStop(){ if(coTimer){ clearInterval(coTimer); coTimer=null; } $("coPlayBtn").textContent="▶ 播放"; }
+function coPlay(){
+  if(coTimer){ coStop(); return; }
+  coReset(); $("coPlayBtn").textContent="⏸ 暂停";
+  coTimer = setInterval(()=>{ if(coR>=CO_R-1){ coStop(); coStep(); } else coStep(); }, 1400);
+}
+function coReset(){ coStop(); coR=-1; coCumC=0; coCumS=0;
+  $("coResult").style.display="none"; $("coState").textContent="点“播放”:逐轮点亮每个工人(lane)实际触碰的元素。";
+  ["coBucketsC","coBucketsS"].forEach(coBuild);
+}
+
+/* ================= §5 float4 分组示意 (N=18) ================= */
+function f4Init(){
+  const box = $("f4buckets"); box.innerHTML="";
+  const N = 18;
+  for(let g=0; g<Math.floor(N/4); g++){
+    const bk = document.createElement("div");
+    bk.className = "bucket";
+    bk.style.background = "#ebfbee"; bk.style.border="1.5px solid #8ce99a";
+    bk.innerHTML = "<div class='blab' style='color:#2b8a3e;'>float4 #"+g+"</div><div class='cells'></div>";
+    const cells = bk.querySelector(".cells");
+    for(let i=0;i<4;i++){ const c=document.createElement("div"); c.className="cell valid"; c.textContent=g*4+i; cells.appendChild(c); }
+    box.appendChild(bk);
+  }
+  const tail = document.createElement("div");
+  tail.className="bucket"; tail.style.background="#fff9db"; tail.style.border="1.5px dashed #f59f00";
+  tail.innerHTML = "<div class='blab' style='color:#b8860b;'>标量尾部</div><div class='cells'></div>";
+  const cells = tail.querySelector(".cells");
+  for(let i=16;i<N;i++){ const c=document.createElement("div"); c.className="cell"; c.style.borderColor="#f59f00"; c.style.color="#b8860b"; c.textContent=i; cells.appendChild(c); }
+  box.appendChild(tail);
+}
+
+/* ================= §6 Triton mask 可视化 (N=13, BLOCK=8) ================= */
+function tpShow(pid){
+  $("tpBtn0").className = pid===0 ? "btn blue" : "btn ghost";
+  $("tpBtn1").className = pid===1 ? "btn blue" : "btn ghost";
+  const start = pid*8;
+  $("tpFormula").innerHTML = "offsets = pid × 8 + [0..7] = <b>["+start+" … "+(start+7)+"]</b>&nbsp;&nbsp;|&nbsp;&nbsp;mask = offsets &lt; 13";
+  const box = $("tpBuckets"); box.innerHTML="";
+  for(let half=0; half<2; half++){
+    const bk = document.createElement("div");
+    bk.className = "bucket"; bk.style.background = half===0?"#e7f5ff":"#f8f9fc";
+    bk.innerHTML = "<div class='blab'>offsets "+(half*8)+"–"+(half*8+7)+"</div><div class='cells'></div>";
+    const cells = bk.querySelector(".cells");
+    for(let i=0;i<8;i++){
+      const idx = half*8+i;
+      const c = document.createElement("div");
+      const valid = idx < 13;
+      c.className = "cell " + (valid?"valid":"masked");
+      c.textContent = valid ? "✓"+idx : "✗"+idx;
+      cells.appendChild(c);
+    }
+    box.appendChild(bk);
+  }
+  const nValid = Math.max(0, Math.min(13, (pid+1)*8) - start);
+  $("tpState").innerHTML = "program <b>"+pid+"</b> 领到 8 个格子,其中 <b>"+nValid+"</b> 个真实存在、正常装货;"+
+    (nValid<8 ? "<b>"+(8-nValid)+"</b> 个越界格子被 mask 拦下(灰色 ✗)——load/store 都不会碰它们,程序也不会崩。" : "全部有效,mask 全为真,无拦截。");
+}
+
+/* ================= §7 带宽柱状图 ================= */
+const BW = [
+  ["triton-t0", 598.8, "0.336 ms", "#1971c2"],
+  ["hip-v0",    598.6, "0.336 ms", "#e8590c"],
+  ["triton-t1", 594.8, "0.339 ms", "#1971c2"],
+  ["hip-v2",    586.1, "0.343 ms", "#e8590c"],
+  ["hip-v3",    583.2, "0.345 ms", "#e8590c"],
+  ["hip-v1 连续", 544.7, "0.370 ms", "#e8590c"],
+  ["hip-v1 跨步",  78.4, "2.567 ms", "#e03131"],
+];
+function bwInit(){
+  const box = $("bwBars");
+  BW.forEach(([name, v, t, color])=>{
+    const row = document.createElement("div"); row.className="bar-row";
+    const pct = Math.max(3, v/640*100);
+    row.innerHTML = "<div class='bar-name'>"+name+"</div>"+
+      "<div class='bar-track'><div class='bar-fill' style='background:"+color+"; width:0%;' data-w='"+pct+"'>"+v+"</div></div>"+
+      "<div class='bar-val'>"+t+" · "+v+" GB/s</div>";
+    box.appendChild(row);
+  });
+  const io = new IntersectionObserver((es)=>{
+    es.forEach(e=>{ if(e.isIntersecting){
+      e.target.querySelectorAll(".bar-fill").forEach(f=>{ f.style.width = f.getAttribute("data-w")+"%"; });
+      io.unobserve(e.target);
+    }});
+  }, {threshold:.3});
+  io.observe(box);
+  setTimeout(()=>{ box.querySelectorAll(".bar-fill").forEach(f=>{ f.style.width = f.getAttribute("data-w")+"%"; }); }, 1500);
+}
+
+/* ================= 启动 ================= */
+document.addEventListener("DOMContentLoaded", function(){
+  depInit();
+  hipCalc();
+  coReset();
+  f4Init();
+  tpShow(0);
+  bwInit();
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>第一部分 · 入门篇(第0-4章) | Hello GPU 图解教材</title>
+<style>
+  :root{
+    --bg:#f5f6fa; --card:#ffffff; --ink:#232936; --ink2:#5a6474; --line:#e3e6ee;
+    --hip:#e8590c; --hip-bg:#fff4e6; --hip-deep:#b23a00;
+    --tri:#1971c2; --tri-bg:#e7f5ff; --tri-deep:#1864ab;
+    --ok:#2f9e44; --ok-bg:#ebfbee;
+    --bad:#e03131; --bad-bg:#fff0f0;
+    --gold:#f59f00; --gold-bg:#fff9db;
+    --violet:#6741d9; --violet-bg:#f3f0ff;
+    --acc:#0ca678; --acc-deep:#087f5b; --acc-bg:#e6fcf5;
+    --code-bg:#1b1e27; --code-ink:#e8eaf0;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html{scroll-behavior:smooth;}
+  body{font-family:"PingFang SC","Microsoft YaHei","Segoe UI",system-ui,sans-serif; background:var(--bg); color:var(--ink); line-height:1.75; font-size:16px;}
+  .wrap{max-width:1060px; margin:0 auto; padding:0 20px 90px;}
+  .topbar{position:sticky; top:0; z-index:50; background:rgba(245,246,250,.92); backdrop-filter:blur(8px); border-bottom:1px solid var(--line);}
+  .topbar .in{max-width:1060px; margin:0 auto; padding:10px 20px; display:flex; gap:14px; align-items:center; flex-wrap:wrap;}
+  .logo{font-weight:800; color:var(--ink); text-decoration:none; white-space:nowrap;}
+  .logo b{color:var(--acc);}
+  .topbar nav{display:flex; gap:4px; flex-wrap:wrap;}
+  .topbar nav a{font-size:13px; color:var(--ink2); text-decoration:none; padding:4px 9px; border-radius:20px; white-space:nowrap;}
+  .topbar nav a:hover{background:var(--ink); color:#fff;}
+  .topbar nav a.cur{background:var(--acc); color:#fff;}
+  .hero{margin-top:34px; padding:42px 38px; border-radius:22px; color:#fff; background:linear-gradient(120deg,#0b2e24 0%,#0e4a38 55%,#116149 100%); position:relative; overflow:hidden;}
+  .hero::after{content:""; position:absolute; right:-70px; top:-70px; width:280px; height:280px; border-radius:50%; background:radial-gradient(circle,rgba(56,217,169,.3),transparent 65%);}
+  .hero .kicker{font-size:13px; letter-spacing:2px; opacity:.75; margin-bottom:12px;}
+  .hero h1{font-size:clamp(25px,4vw,38px); line-height:1.3; margin-bottom:14px;}
+  .hero h1 em{font-style:normal; color:#96f2d7;}
+  .hero p{max-width:760px; color:#cfe8de; font-size:15.5px;}
+  .chips{margin-top:20px; display:flex; gap:10px; flex-wrap:wrap;}
+  .chip{font-size:12.5px; padding:5px 13px; border-radius:20px; background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.22);}
+  .hero .oneline{margin-top:24px; padding:14px 18px; border-left:4px solid #96f2d7; background:rgba(255,255,255,.07); border-radius:0 12px 12px 0; font-size:15px; color:#f1f3f8;}
+  section{margin-top:56px;}
+  .sec-head{display:flex; align-items:baseline; gap:14px; margin-bottom:8px;}
+  .sec-num{flex:none; width:46px; height:46px; border-radius:14px; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:18px; color:#fff; background:linear-gradient(135deg,#38d9a9,#0ca678); transform:rotate(-3deg); box-shadow:3px 4px 0 rgba(12,166,120,.22);}
+  .sec-head h2{font-size:clamp(20px,3vw,26px);}
+  .sec-sub{color:var(--ink2); font-size:14.5px; margin-bottom:20px; padding-left:60px;}
+  .card{background:var(--card); border:1px solid var(--line); border-radius:16px; padding:24px 26px; margin-top:18px; box-shadow:0 1px 3px rgba(35,41,54,.05);}
+  .card h3{font-size:18px; margin-bottom:12px;}
+  .card h4{font-size:15.5px; margin:18px 0 8px;}
+  p + p{margin-top:10px;}
+  .muted{color:var(--ink2);}
+  code.inline{background:#eef0f6; border:1px solid #e0e3ec; padding:1px 7px; border-radius:6px; font-size:13.5px; font-family:"Cascadia Code",Consolas,Menlo,monospace; color:#1c2a4a; white-space:nowrap;}
+  .callout{border-radius:14px; padding:16px 20px; margin-top:18px; font-size:15px; border:1px solid;}
+  .callout .tt{font-weight:800; margin-bottom:6px; display:flex; gap:8px; align-items:center;}
+  .callout.plain{background:#f4f5f9; border-color:#e3e6ee;}
+  .callout.analogy{background:#fdf6ec; border-color:#f3d9a4;}
+  .callout.analogy .tt{color:#b8860b;}
+  .callout.warn{background:var(--bad-bg); border-color:#ffc2c2;}
+  .callout.warn .tt{color:var(--bad);}
+  .callout.ok{background:var(--ok-bg); border-color:#b2f2bb;}
+  .callout.ok .tt{color:var(--ok);}
+  .callout.acc{background:var(--acc-bg); border-color:#96f2d7;}
+  .callout.acc .tt{color:var(--acc-deep);}
+  .callout.gold{background:var(--gold-bg); border-color:#ffe08a;}
+  .callout.gold .tt{color:#b8860b;}
+  .callout.violet{background:var(--violet-bg); border-color:#d0bfff;}
+  .callout.violet .tt{color:var(--violet);}
+  .grid2{display:grid; grid-template-columns:1fr 1fr; gap:18px;}
+  @media (max-width:820px){ .grid2{grid-template-columns:1fr;} .sec-sub{padding-left:0;} }
+  .code{background:var(--code-bg); color:var(--code-ink); border-radius:14px; margin-top:14px; font-family:"Cascadia Code",Consolas,Menlo,monospace; font-size:13.5px; line-height:1.7; overflow-x:auto;}
+  .code .cap{display:flex; justify-content:space-between; padding:9px 16px; font-size:12.5px; color:#9aa3b5; border-bottom:1px solid #2a2e3a; font-family:"PingFang SC","Microsoft YaHei",sans-serif;}
+  .code .cap .lang{padding:2px 10px; border-radius:6px; background:#2a2e3a; letter-spacing:1px;}
+  .code pre{padding:16px 18px; white-space:pre;}
+  .code .k{color:#ff8787;} .code .t{color:#74c0fc;} .code .f{color:#ffd43b;} .code .n{color:#f7b26a;} .code .c{color:#7d859c; font-style:italic;} .code .s{color:#a9e34b;}
+  table{width:100%; border-collapse:collapse; margin-top:14px; font-size:14px; background:#fff; border-radius:12px; overflow:hidden;}
+  th,td{padding:9px 13px; border-bottom:1px solid var(--line); text-align:left;}
+  th{background:#f1f3f8; font-size:13px; color:#3c4658;}
+  tr:last-child td{border-bottom:none;}
+  .num{font-variant-numeric:tabular-nums; white-space:nowrap;}
+  details{background:#fff; border:1px solid var(--line); border-radius:12px; margin-top:10px; padding:14px 18px;}
+  details summary{cursor:pointer; font-weight:700; font-size:15px;}
+  details .ans{margin-top:10px; padding:10px 14px; border-radius:10px; background:var(--ok-bg); font-size:14px; color:#2b8a3e;}
+  footer{margin-top:70px; padding-top:24px; border-top:1px solid var(--line); color:var(--ink2); font-size:13.5px;}
+  footer a{color:var(--tri);}
+  .partnav{display:flex; justify-content:space-between; gap:14px; margin-top:60px; flex-wrap:wrap;}
+  .partnav a{text-decoration:none; font-weight:700; padding:14px 20px; border-radius:14px; background:#fff; border:1.5px solid var(--line); color:var(--ink); font-size:14.5px;}
+  .partnav a:hover{border-color:var(--acc); color:var(--acc-deep);}
+  /* 门禁三卡 */
+  .gate{display:grid; grid-template-columns:repeat(3,1fr); gap:14px; margin-top:16px;}
+  @media (max-width:820px){.gate{grid-template-columns:1fr;}}
+  .gate .g{border-radius:14px; padding:16px 18px; background:#fff; border:2px solid #96f2d7; text-align:center;}
+  .gate .g .no{font-size:26px;}
+  .gate .g b{display:block; margin:6px 0 4px; font-size:15px;}
+  .gate .g p{font-size:13px; color:var(--ink2);}
+  /* 层级金字塔 */
+  .pyr{display:flex; flex-direction:column; gap:8px; margin-top:16px; align-items:center;}
+  .pyr .lv{border-radius:10px; padding:8px 16px; font-size:13.5px; font-weight:700; text-align:center; width:100%;}
+  .pyr .lv small{font-weight:400; opacity:.85;}
+  /* 流程链 */
+  .flow{display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-top:14px;}
+  .flow .st{background:#fff; border:2px solid #96f2d7; border-radius:10px; padding:8px 14px; font-size:13.5px; font-weight:700;}
+  .flow .ar{color:#8a93a6; font-weight:800;}
+</style>
+</head>
+<body>
+<div class="topbar"><div class="in">
+  <a class="logo" href="index.html">Hello·GPU <b>图解教材</b></a>
+  <nav>
+    <a href="index.html">首页</a>
+    <a href="part0.html" class="cur">① 入门 0-4</a>
+    <a href="part1.html">② 量准 5-7</a>
+    <a href="part2.html">③ 算子 8-13</a>
+    <a href="part3.html">④ Agent 14-17</a>
+    <a href="part4.html">⑤ 实战 18-19</a>
+  </nav>
+</div></div>
+
+<div class="wrap">
+
+<header class="hero">
+  <div class="kicker">PART 0 · 入门篇 · 第 0-4 章</div>
+  <h1>入门篇:<em>认识 GPU</em>,把动手的路铺平</h1>
+  <p>这部分不急着写代码。先弄明白这本书要解决什么问题(第0章),把环境跑通(第1章),建立 GPU 硬件的心智模型(第2、3章),最后亲手跑通第一个 kernel 并第一次算出"离硬件极限有多远"(第4章)。</p>
+  <div class="chips">
+    <span class="chip">RX 9070 XT · ROCm 7.13 · Ubuntu 24.04</span>
+    <span class="chip">三道门环境体检</span>
+    <span class="chip">grid / workgroup / wavefront</span>
+    <span class="chip">VGPR · LDS · 合并访存</span>
+    <span class="chip">第一个 benchmark</span>
+  </div>
+  <div class="oneline">💡 <b>本篇一句话:</b>GPU 优化的所有结论,都建立在你对硬件的"心智模型"之上——先搞清楚工人在哪、货从哪来、路有多宽,再谈怎么快。</div>
+</header>
+
+<!-- ============ CH0 ============ -->
+<section id="ch0">
+  <div class="sec-head"><div class="sec-num">0</div><h2>写给读者的话:这本书要带你去哪</h2></div>
+  <div class="sec-sub">不写代码的一章,但决定了你怎么读后面 19 章。</div>
+
+  <div class="card">
+    <h3>🗺️ 全书解决什么问题?</h3>
+    <p><b>GPU 算子优化</b>——让 GPU 上的计算跑得又对又快的整套工程能力。它串起算法、kernel 代码、访存模式和硬件资源。你可能问过这些问题:</p>
+    <ul style="margin:12px 0 0 22px;">
+      <li>我的 kernel 到底<b>慢在哪</b>?</li>
+      <li>瓶颈是<b>访存</b>还是<b>计算</b>?</li>
+      <li>这个改动是<b>真的变快了</b>,还是测量在骗我?</li>
+      <li>这套"测量→定位→修改→再测"的流程,能不能<b>交给 Agent 自动跑</b>?</li>
+    </ul>
+    <div class="callout analogy">
+      <div class="tt">🗣️ 白话:整车思维</div>
+      判断一辆车为什么跑不快,不能只盯着发动机一个零件。GPU 优化也一样:kernel(发动机)、访存(油路)、硬件资源(底盘)是一个系统,本书教你的是"整车调校",不是"换个火花塞"。
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>🧭 三条主线(全书地图)</h3>
+    <table>
+      <tr><th>主线</th><th>核心思想</th><th>白话理解</th></tr>
+      <tr><td><b>Profiling-Driven</b></td><td>先看数据再改代码,一切优化必须经 benchmark + profiling 验证</td><td>先体检,后开药。过滤"看上去变快了"的伪优化</td></tr>
+      <tr><td><b>刷题导向</b></td><td>每个算子走完 naive→优化的完整路径;顺序永远是:先正确性 → 再带宽 → 最后算术强度</td><td>不做知识点串讲,做完整案例训练</td></tr>
+      <tr><td><b>Agent-Driven</b></td><td>把优化闭环交给 Agent 自动跑;要记录失败尝试(失败记录比成功更值钱)</td><td>不是"让大模型随便生成代码",而是给它尺子和裁判</td></tr>
+    </table>
+    <div class="flow">
+      <span class="st">理解硬件</span><span class="ar">→</span>
+      <span class="st">学会 profiling</span><span class="ar">→</span>
+      <span class="st">手写算子并优化</span><span class="ar">→</span>
+      <span class="st">刷题攒方法论</span><span class="ar">→</span>
+      <span class="st">交给 Agent 自动化</span>
+    </div>
+    <div class="callout warn">
+      <div class="tt">⚠️ 给初学者的最重要的警告</div>
+      千万不要跳过第 1 篇(profiling,第 5-7 章)!<b>测不准的时候,"优化"就是赌博。</b>benchmark 数据的质量,决定你优化判断的上限。
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>📦 实验平台与时间预算</h3>
+    <div class="grid2">
+      <div class="callout plain">
+        <div class="tt">🧰 全书基线平台</div>
+        AMD Radeon <b>RX 9070 XT</b>(gfx1201)+ <b>ROCm 7.13</b> + 原生 <b>Ubuntu 24.04</b>。选消费级卡是因为好买、便宜;选 Linux 是因为 ROCm 没有官方 Windows 支持。这不是"反 CUDA",是教学环境的现实选择。
+      </div>
+      <div class="callout plain">
+        <div class="tt">⏱️ 学习时间参考(每天 2-3 小时)</div>
+        入门篇 1-2 天 · Profiling 篇 2-3 天 · 算子篇 5-7 天 · Agent 篇 3-4 天 · 实战篇 3-4 天,<b>全程约 2-3 周</b>。Agent 篇的目标:自动把 naive kernel 优化 3-5 倍。
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ CH1 ============ -->
+<section id="ch1">
+  <div class="sec-head"><div class="sec-num">1</div><h2>环境准备:连过三道门,路才算通</h2></div>
+  <div class="sec-sub">像开工前的体检表——三道门全过,后面的学习才不会卡在"跑不通"上。</div>
+
+  <div class="card">
+    <h3>🚪 三道门</h3>
+    <div class="gate">
+      <div class="g"><div class="no">🩺</div><b>第一道:ROCm 能看到 GPU</b><p>运行 <code class="inline">rocminfo</code>,能看到 <code class="inline">gfx1201</code> 和 64 个 CU → 驱动+运行时是好的</p></div>
+      <div class="g"><div class="no">🔥</div><b>第二道:PyTorch 能用 GPU</b><p>1024×1024 矩阵乘冒烟测试,输出 <code class="inline">cuda_available: True</code>(cuda 是历史命名,不代表 NVIDIA 卡)</p></div>
+      <div class="g"><div class="no">🔧</div><b>第三道:HIP 能编译运行</b><p>手写 vector_add 编译跑通,输出 <code class="inline">status: PASS</code> → 手写 kernel 的路打通</p></div>
+    </div>
+    <div class="callout acc">
+      <div class="tt">🛠️ 环境一条命令复现</div>
+      依赖全部写进 <code class="inline">pyproject.toml + uv.lock</code>,一条 <code class="inline">uv sync</code> + <code class="inline">source ./activate-rocm.sh</code> 装好 17 个包(torch 2.11.0+rocm7.13.0、triton 3.6.0 等)。不手动装包、不猜版本——<b>环境本身也要可复现</b>。
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>🏥 第一次看懂 HIP 程序的"住院流程"</h3>
+    <p>最小 HIP 程序的六个步骤,后面所有算子都是这个骨架,变的只是 kernel 内部:</p>
+    <div class="flow">
+      <span class="st">① Host 备好数据</span><span class="ar">→</span>
+      <span class="st">② hipMalloc 显存</span><span class="ar">→</span>
+      <span class="st">③ H2D 拷入</span><span class="ar">→</span>
+      <span class="st">④ 启动 Kernel</span><span class="ar">→</span>
+      <span class="st">⑤ D2H 拷回</span><span class="ar">→</span>
+      <span class="st">⑥ 检查+释放</span>
+    </div>
+    <div class="callout analogy">
+      <div class="tt">🗣️ 白话:文员与车间</div>
+      Host(CPU+内存)是<b>文员</b>:备料、发单、收货;Device(GPU+显存)是<b>车间</b>:只管加工。③⑤ 步是传送带(hipMemcpy),④ 步之后要 <code class="inline">hipDeviceSynchronize</code> 等车间干完——文员发完单不等于货做好了。
+    </div>
+    <div class="callout warn">
+      <div class="tt">⚠️ 本章的坑</div>
+      <b>①</b> <code class="inline">ROCM_PATH</code> 必须指向 <code class="inline">_rocm_sdk_devel</code>,指错成 core 会报 "cannot find ROCm device library"。<b>②</b> WSL2 里计算路径可用,但 rocm-smi/硬件计数器不可用,别当前提。<b>③</b> 排错时只说"跑不通"最糟糕——要给机器信息、完整命令、期望与实际输出,用 <code class="inline">2>&amp;1 | tee xxx.log</code> 留日志。
+    </div>
+  </div>
+</section>
+
+<!-- ============ CH2 ============ -->
+<section id="ch2">
+  <div class="sec-head"><div class="sec-num">2</div><h2>GPU 体系结构(上):线程怎么组织、怎么执行</h2></div>
+  <div class="sec-sub">跟着一次 kernel 提交,从软件分层一路走到硬件执行。</div>
+
+  <div class="card">
+    <h3>🚌 四层结构:从全厂到工位</h3>
+    <table>
+      <tr><th>软件层名字</th><th>CUDA 叫法</th><th>AMD 叫法</th><th>白话理解</th></tr>
+      <tr><td>Grid</td><td>grid</td><td>一次 dispatch</td><td>这次任务的<b>全体工人</b></td></tr>
+      <tr><td>Block</td><td>block</td><td>workgroup</td><td><b>车间</b>:组内可协作、共用 LDS</td></tr>
+      <tr><td>—</td><td>warp</td><td>wavefront</td><td><b>小队</b>:硬件调度的最小单位,本机 32 人</td></tr>
+      <tr><td>Thread</td><td>thread</td><td>work-item / lane</td><td><b>工人</b>:一个逻辑编号,一份工作</td></tr>
+    </table>
+    <p>全局工号公式(第 8 章还会重逢):<code class="inline">tid = blockIdx.x * blockDim.x + threadIdx.x</code>,配 <code class="inline">if (tid &lt; n)</code> 越界保护。本机 256 线程的 block = <b>8 个 wave32 小队</b>。</p>
+    <div class="callout analogy">
+      <div class="tt">🗣️ 白话:大巴与一排座位</div>
+      workgroup 是大巴上的<b>全体乘客</b>,wavefront 是<b>一排座位(32 个)</b>。硬件每次只对"一排"下达同一个动作——这一排就是执行的原子单位。
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>🎭 EXEC 掩码:分支发散的真相</h3>
+    <p>同一排的 lane 走了不同的 if/else 分支怎么办?硬件的办法是<b>用掩码轮流执行</b>:保存掩码 → 让走 then 的 lane 执行(其他人失活)→ 反转掩码让走 else 的执行 → 恢复合流。</p>
+    <div class="callout warn">
+      <div class="tt">⚠️ 关键结论:不是两条路并行,是排队各走一遍</div>
+      失活的 lane 不离场,只是原地待命。所以分支发散的代价是:<b>整排的执行时间被最长的路径拖住</b>。原文实测(16M 元素,受控实验):波前一致分支 0.237 ms,lane 级发散分支 0.245 ms,<b>+3.33%</b>——代价真实存在,但属于这个受控组合,不是"发散永远慢 3%"的通用罚单。
+    </div>
+    <div class="callout plain">
+      <div class="tt">📌 软件分层 ≠ 硬件落点</div>
+      LLVM 唯一保证的是:<b>同一 workgroup 的所有 wavefront 一定落在同一个 WGP 上</b>。其余(CU 怎么摆、哪个 SIMD 跑)取决于编译器,不能从源码反推。另外 <code class="inline">multiProcessorCount=32</code> 是诊断字段,≠ 物理的 64 个 CU,别混用名字。
+    </div>
+  </div>
+</section>
+
+<!-- ============ CH3 ============ -->
+<section id="ch3">
+  <div class="sec-head"><div class="sec-num">3</div><h2>GPU 体系结构(下):片上资源、数据通路与带宽</h2></div>
+  <div class="sec-sub">工人能同时接多少活、货走哪条路、路宽差多少倍——这一章回答三件事。</div>
+
+  <div class="card">
+    <h3>🏗️ 六层存储金字塔:越小越快,越大越远</h3>
+    <div class="pyr">
+      <div class="lv" style="width:34%; background:#d3f9d8; border:2px solid #69db7c;">寄存器 VGPR/SGPR<small> · 工人手边桌面</small></div>
+      <div class="lv" style="width:48%; background:#c5f6fa; border:2px solid #66d9e8;">LDS 128 KiB<small> · 车间货架(workgroup 共享,显式管理)</small></div>
+      <div class="lv" style="width:60%; background:#fff3bf; border:2px solid #ffd43b;">L0 缓存(向量 32K / 标量 16K)<small> · 硬件自动管</small></div>
+      <div class="lv" style="width:72%; background:#ffe8cc; border:2px solid #ffa94d;">L2 8 MiB + Infinity Cache 64 MiB</div>
+      <div class="lv" style="width:88%; background:#ffe3e3; border:2px solid #ff8787;">GDDR6 16 GB · 约 640 GB/s<small> · 远处总仓</small></div>
+    </div>
+    <div class="callout acc">
+      <div class="tt">🎯 占用率:能同时塞多少活</div>
+      一个 wavefront 等显存回话时,硬件切给别的 wavefront 干活(延迟隐藏)。能同时驻留多少 wavefront,由 <b>VGPR / SGPR / LDS 谁先用光</b>决定,而不是线程数。比喻:产线数量受"最先耗尽的资源"限制——工具柜、图纸柜、工作台,哪个满了都上不了新人。⚠️ 占用率也不是越高越好:硬压寄存器会逼出溢出(spill),反而更慢。
+    </div>
+    <div class="callout warn">
+      <div class="tt">⚠️ 三个最常踩的概念坑</div>
+      <b>① LDS 不是缓存</b>——它是你显式分配、自己摆货的货架;缓存才是系统自动管的。<b>② 逻辑字节 ≠ 物理流量</b>——按算法算的读写量,和真实 DRAM 事务量是两回事(缓存可能命中)。<b>③ 规格容量 ≠ 性能</b>——"有 128 KiB LDS"不等于"用满就快"。
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>🚗 三组实测:路宽差多少倍?</h3>
+    <div class="grid2">
+      <div class="callout plain">
+        <div class="tt">① 合并访存(读全局内存)</div>
+        相邻 lane 读相邻地址 = 一卡车拉一排货架;<b>stride-257 打散后,带宽从 571 GB/s 掉到 71 GB/s(约 1/8)</b>。这就是第 8 章 6.95 倍实验的理论地基。
+      </div>
+      <div class="callout plain">
+        <div class="tt">② LDS bank 冲突</div>
+        LDS 内部有多个可并行的"收银台"(bank)。stride-32 让 32 人挤同一台 → 42.2 ms;<b>stride-33 错开一台 → 8.09 ms,回到基线</b>。排队还是分流,就差一个错位。
+      </div>
+    </div>
+    <div class="callout plain">
+      <div class="tt">③ WMMA:矩阵专用快车道</div>
+      整条 wave32 协作调用一条矩阵乘加指令,合力算一块 16×16×16(FP16 输入/FP32 累加)。教学微基准里 <b>2.30×</b> 于普通 VALU 循环(2.08 vs 0.90 TFLOPS)。比喻:32 人从"各算各的"变成"流水线分工"。代价:布局是芯片定死的,而且它远非 rocBLAS 的理论峰值。
+    </div>
+    <div class="callout acc">
+      <div class="tt">📋 结论三分法(原文的治学态度)</div>
+      <b>可迁移</b>:边界正确性优先、逻辑与物理指标分离。<b>需重测</b>:stride、LDS 布局、资源占用、分支代价——换卡换形状要重新量。<b>仅 gfx12</b>:WMMA intrinsic 是本代专属。
+    </div>
+  </div>
+</section>
+
+<!-- ============ CH4 ============ -->
+<section id="ch4">
+  <div class="sec-head"><div class="sec-num">4</div><h2>第一个程序 + 第一次性能分析</h2></div>
+  <div class="sec-sub">跑通手写 vector add,并第一次回答:"我离硬件极限有多远?"</div>
+
+  <div class="card">
+    <h3>📏 第一把尺子:算术强度与带宽利用率</h3>
+    <div class="grid2">
+      <div class="callout acc">
+        <div class="tt">📐 算术强度 AI</div>
+        AI = 计算量 ÷ 搬运量。vector add 每元素:读 a 4B + 读 b 4B + 写 c 4B = 12 字节,只做 1 次加法 → <b>AI ≈ 0.083 FLOP/Byte</b>。搬得多、算得少 → 必然卡在"腿"(访存)而不是"脑"(计算)。
+      </div>
+      <div class="callout acc">
+        <div class="tt">📊 带宽利用率</div>
+        实测(N=16.7M,warmup 5 + repeat 30,GPU event 计时):GPU median <b>0.347 ms</b>,有效带宽 <b>583 GB/s</b>。利用率 = 583 ÷ 640 ≈ <b>91%</b> → 访存效率已经到位,想再快只能提高算术强度(融合算子)。
+      </div>
+    </div>
+    <div class="callout analogy">
+      <div class="tt">🗣️ 白话:GPU 比 CPU 快 21 倍?</div>
+      实测 GPU 0.347 ms vs CPU 8.54 ms ≈ 21 倍——但这是"数据已在显存、只量 kernel"的口径。算上 Host↔Device 搬运,差距小得多;数据再小,CPU 反超。正确问法是算<b>总账</b>:kernel 执行 + 数据搬运 + 启动开销,值不值?
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>⏱️ 计时四件套(第一次登场)</h3>
+    <div class="code">
+      <div class="cap"><span>benchmark_vector_add.py 核心</span><span class="lang">Python</span></div>
+<pre>start.record(); c = a + b; end.record()   <span class="c"># 在 GPU 时间线打两个点</span>
+torch.cuda.synchronize()                  <span class="c"># 等 GPU 真干完</span>
+times.append(start.elapsed_time(end))     <span class="c"># 取两点间隔(ms)</span>
+<span class="c"># warmup 5 次甩掉冷启动 → 正式 repeat 30 次 → 用 min 估带宽</span></pre>
+    </div>
+    <div class="callout warn">
+      <div class="tt">⚠️ dispatch 开销:什么时候不能忽略?</div>
+      发射一个 kernel 要走:host API → 内核驱动 → 写 AQL 包 → 敲门铃 → GPU 调度,实测约 <b>2.6 μs</b>。本章 kernel 0.345 ms,启动占比不到 1%,可忽略。但如果把任务拆成成百上千个小 kernel(后面的 split-KV 案例),<b>启动开销就能吃掉全部收益</b>。
+    </div>
+    <div class="callout ok">
+      <div class="tt">✅ 本章验收 + 试一试</div>
+      vector_add 输出 <code class="inline">status: PASS, max_error: 0</code>;benchmark 输出 PASS。试一试:把 <code class="inline">--size</code> 改成 1&lt;&lt;20 和 1&lt;&lt;26 各跑一次,先猜带宽是单调变化还是先升后降——建立"规模 vs 性能"的第一感觉。<b>记得写实验记录:目标→流程→结论</b>,不留记录,三天后等于白做。
+    </div>
+  </div>
+</section>
+
+<div class="partnav">
+  <a href="index.html">🏠 返回教材首页</a>
+  <a href="part1.html">下一部分 · Profiling 篇(第5-7章):把时间量准 →</a>
+</div>
+
+<footer>
+  <p>内容整理自 <a href="https://github.com/datawhalechina/hello-gpu" target="_blank">datawhalechina/hello-gpu</a> 第 0-4 章 · 白话重述与图解,数据引自原文实测;如有出入以原文为准。</p>
+</footer>
+</div>
+</body>
+</html>

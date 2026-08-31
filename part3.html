@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>第四部分 · Agent 篇(第14-17章) | Hello GPU 图解教材</title>
+<style>
+  :root{
+    --bg:#f5f6fa; --card:#ffffff; --ink:#232936; --ink2:#5a6474; --line:#e3e6ee;
+    --hip:#e8590c; --hip-bg:#fff4e6; --hip-deep:#b23a00;
+    --tri:#1971c2; --tri-bg:#e7f5ff; --tri-deep:#1864ab;
+    --ok:#2f9e44; --ok-bg:#ebfbee;
+    --bad:#e03131; --bad-bg:#fff0f0;
+    --gold:#f59f00; --gold-bg:#fff9db;
+    --violet:#6741d9; --violet-bg:#f3f0ff;
+    --acc:#d6336c; --acc-deep:#a61e4d; --acc-bg:#fff0f6;
+    --code-bg:#1b1e27; --code-ink:#e8eaf0;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html{scroll-behavior:smooth;}
+  body{font-family:"PingFang SC","Microsoft YaHei","Segoe UI",system-ui,sans-serif; background:var(--bg); color:var(--ink); line-height:1.75; font-size:16px;}
+  .wrap{max-width:1060px; margin:0 auto; padding:0 20px 90px;}
+  .topbar{position:sticky; top:0; z-index:50; background:rgba(245,246,250,.92); backdrop-filter:blur(8px); border-bottom:1px solid var(--line);}
+  .topbar .in{max-width:1060px; margin:0 auto; padding:10px 20px; display:flex; gap:14px; align-items:center; flex-wrap:wrap;}
+  .logo{font-weight:800; color:var(--ink); text-decoration:none; white-space:nowrap;}
+  .logo b{color:var(--acc);}
+  .topbar nav{display:flex; gap:4px; flex-wrap:wrap;}
+  .topbar nav a{font-size:13px; color:var(--ink2); text-decoration:none; padding:4px 9px; border-radius:20px; white-space:nowrap;}
+  .topbar nav a:hover{background:var(--ink); color:#fff;}
+  .topbar nav a.cur{background:var(--acc); color:#fff;}
+  .hero{margin-top:34px; padding:42px 38px; border-radius:22px; color:#fff; background:linear-gradient(120deg,#33091d 0%,#6e1c3f 55%,#9c2a56 100%); position:relative; overflow:hidden;}
+  .hero::after{content:""; position:absolute; right:-70px; top:-70px; width:280px; height:280px; border-radius:50%; background:radial-gradient(circle,rgba(248,131,172,.3),transparent 65%);}
+  .hero .kicker{font-size:13px; letter-spacing:2px; opacity:.75; margin-bottom:12px;}
+  .hero h1{font-size:clamp(25px,4vw,38px); line-height:1.3; margin-bottom:14px;}
+  .hero h1 em{font-style:normal; color:#fcc2d7;}
+  .hero p{max-width:780px; color:#f2d7e2; font-size:15.5px;}
+  .chips{margin-top:20px; display:flex; gap:10px; flex-wrap:wrap;}
+  .chip{font-size:12.5px; padding:5px 13px; border-radius:20px; background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.22);}
+  .hero .oneline{margin-top:24px; padding:14px 18px; border-left:4px solid #fcc2d7; background:rgba(255,255,255,.07); border-radius:0 12px 12px 0; font-size:15px; color:#f1f3f8;}
+  section{margin-top:56px;}
+  .sec-head{display:flex; align-items:baseline; gap:14px; margin-bottom:8px;}
+  .sec-num{flex:none; width:46px; height:46px; border-radius:14px; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:18px; color:#fff; background:linear-gradient(135deg,#f783ac,#d6336c); transform:rotate(-3deg); box-shadow:3px 4px 0 rgba(214,51,108,.22);}
+  .sec-head h2{font-size:clamp(20px,3vw,26px);}
+  .sec-sub{color:var(--ink2); font-size:14.5px; margin-bottom:20px; padding-left:60px;}
+  .card{background:var(--card); border:1px solid var(--line); border-radius:16px; padding:24px 26px; margin-top:18px; box-shadow:0 1px 3px rgba(35,41,54,.05);}
+  .card h3{font-size:18px; margin-bottom:12px;}
+  p + p{margin-top:10px;}
+  .muted{color:var(--ink2);}
+  code.inline{background:#eef0f6; border:1px solid #e0e3ec; padding:1px 7px; border-radius:6px; font-size:13.5px; font-family:"Cascadia Code",Consolas,Menlo,monospace; color:#1c2a4a; white-space:nowrap;}
+  .callout{border-radius:14px; padding:16px 20px; margin-top:18px; font-size:15px; border:1px solid;}
+  .callout .tt{font-weight:800; margin-bottom:6px; display:flex; gap:8px; align-items:center;}
+  .callout.plain{background:#f4f5f9; border-color:#e3e6ee;}
+  .callout.analogy{background:#fdf6ec; border-color:#f3d9a4;}
+  .callout.analogy .tt{color:#b8860b;}
+  .callout.warn{background:var(--bad-bg); border-color:#ffc2c2;}
+  .callout.warn .tt{color:var(--bad);}
+  .callout.ok{background:var(--ok-bg); border-color:#b2f2bb;}
+  .callout.ok .tt{color:var(--ok);}
+  .callout.acc{background:var(--acc-bg); border-color:#fcc2d7;}
+  .callout.acc .tt{color:var(--acc-deep);}
+  .callout.gold{background:var(--gold-bg); border-color:#ffe08a;}
+  .callout.gold .tt{color:#b8860b;}
+  .callout.violet{background:var(--violet-bg); border-color:#d0bfff;}
+  .callout.violet .tt{color:var(--violet);}
+  .grid2{display:grid; grid-template-columns:1fr 1fr; gap:18px;}
+  @media (max-width:820px){ .grid2{grid-template-columns:1fr;} .sec-sub{padding-left:0;} }
+  .code{background:var(--code-bg); color:var(--code-ink); border-radius:14px; margin-top:14px; font-family:"Cascadia Code",Consolas,Menlo,monospace; font-size:13.5px; line-height:1.7; overflow-x:auto;}
+  .code .cap{display:flex; justify-content:space-between; padding:9px 16px; font-size:12.5px; color:#9aa3b5; border-bottom:1px solid #2a2e3a; font-family:"PingFang SC","Microsoft YaHei",sans-serif;}
+  .code .cap .lang{padding:2px 10px; border-radius:6px; background:#2a2e3a; letter-spacing:1px;}
+  .code pre{padding:16px 18px; white-space:pre;}
+  .code .k{color:#ff8787;} .code .t{color:#74c0fc;} .code .f{color:#ffd43b;} .code .n{color:#f7b26a;} .code .c{color:#7d859c; font-style:italic;} .code .s{color:#a9e34b;}
+  table{width:100%; border-collapse:collapse; margin-top:14px; font-size:14px; background:#fff; border-radius:12px; overflow:hidden;}
+  th,td{padding:9px 13px; border-bottom:1px solid var(--line); text-align:left;}
+  th{background:#f1f3f8; font-size:13px; color:#3c4658;}
+  tr:last-child td{border-bottom:none;}
+  .num{font-variant-numeric:tabular-nums; white-space:nowrap;}
+  .t-bad td{background:var(--bad-bg);}
+  .t-good td{background:var(--ok-bg);}
+  footer{margin-top:70px; padding-top:24px; border-top:1px solid var(--line); color:var(--ink2); font-size:13.5px;}
+  footer a{color:var(--tri);}
+  .partnav{display:flex; justify-content:space-between; gap:14px; margin-top:60px; flex-wrap:wrap;}
+  .partnav a{text-decoration:none; font-weight:700; padding:14px 20px; border-radius:14px; background:#fff; border:1.5px solid var(--line); color:var(--ink); font-size:14.5px;}
+  .partnav a:hover{border-color:var(--acc); color:var(--acc-deep);}
+  /* 循环图 */
+  .loop{display:flex; flex-wrap:wrap; gap:8px; align-items:center; justify-content:center; margin-top:16px; padding:18px; background:#fafbfe; border:1px dashed #d5dae6; border-radius:14px;}
+  .loop .st{background:#fff; border:2px solid #fcc2d7; border-radius:10px; padding:8px 14px; font-size:13.5px; font-weight:700;}
+  .loop .st.brain{border-color:#d0bfff; background:var(--violet-bg);}
+  .loop .st.tool{border-color:#a5d8ff; background:var(--tri-bg);}
+  .loop .st.judge{border-color:#b2f2bb; background:var(--ok-bg);}
+  .loop .ar{color:#8a93a6; font-weight:800;}
+  .loop .back{flex-basis:100%; text-align:center; color:#a61e4d; font-weight:700; font-size:13px;}
+  /* 逐轮账本 */
+  .rounds{margin-top:14px;}
+  .rrow{display:grid; grid-template-columns:52px 1fr 110px 90px; gap:10px; align-items:center; margin-bottom:7px; font-size:13px;}
+  .rname{font-weight:800; color:var(--ink2);}
+  .rtrack{background:#eef0f6; border-radius:7px; height:22px; position:relative;}
+  .rfill{position:absolute; top:3px; left:3px; bottom:3px; border-radius:5px; display:flex; align-items:center; padding-left:8px; color:#fff; font-size:11px; font-weight:700; white-space:nowrap;}
+  .rdesc{color:var(--ink2); font-size:12.5px;}
+  .rres{font-weight:800; text-align:right;}
+  .rres.ok{color:var(--ok);} .rres.no{color:var(--bad);}
+</style>
+</head>
+<body>
+<div class="topbar"><div class="in">
+  <a class="logo" href="index.html">Hello·GPU <b>图解教材</b></a>
+  <nav>
+    <a href="index.html">首页</a>
+    <a href="part0.html">① 入门 0-4</a>
+    <a href="part1.html">② 量准 5-7</a>
+    <a href="part2.html">③ 算子 8-13</a>
+    <a href="part3.html" class="cur">④ Agent 14-17</a>
+    <a href="part4.html">⑤ 实战 18-19</a>
+  </nav>
+</div></div>
+
+<div class="wrap">
+
+<header class="hero">
+  <div class="kicker">PART 3 · AGENT 篇 · 第 14-17 章</div>
+  <h1>Agent 篇:<em>让 AI 替你跑</em>优化闭环</h1>
+  <p>把前两部分教给人类的方法论——可信计时、Roofline、单变量实验、留痕记录——封装成 Agent 可调用的工具,让大模型在"带尺子的考场"里自动优化 kernel。四章递进:<b>Agent 是什么</b> → <b>工具怎么封装</b> → <b>循环怎么组装</b> → <b>实战跑通 2.19 倍</b>。</p>
+  <div class="chips">
+    <span class="chip">Agent = LLM + 工具 + 循环</span>
+    <span class="chip">ReAct + Reflection</span>
+    <span class="chip">权威工具 vs 自由工具</span>
+    <span class="chip">配对裁决晋升制</span>
+    <span class="chip">Radeon 8060S 实测 0.705→0.322 ms</span>
+  </div>
+  <div class="oneline">💡 <b>本篇一句话:</b>LLM 负责理解和提议,代码负责相信什么——性能数字只认工具返回,晋升只认 <code style="color:#ffd43b">accept_candidate</code> 的配对证据。</div>
+</header>
+
+<!-- ============ CH14 ============ -->
+<section id="ch14">
+  <div class="sec-head"><div class="sec-num">14</div><h2>Agent 入门:最简模型与游戏规则</h2></div>
+  <div class="sec-sub">Agent = 大模型(决策)+ 工具(行动)+ 循环(观察→再决策),直到收敛或触达步数上限。</div>
+
+  <div class="card">
+    <h3>🔁 ReAct + Reflection:想一步,做一步,看一步</h3>
+    <div class="loop">
+      <span class="st brain">🧠 LLM 决策(Reason)</span><span class="ar">→</span>
+      <span class="st tool">🔧 调工具(Act)</span><span class="ar">→</span>
+      <span class="st tool">👁 观察结果(Observe)</span><span class="ar">→</span>
+      <span class="st brain">💭 反思策略(Reflect)</span><span class="ar">→</span>
+      <span class="st brain">🧠 下一轮决策…</span>
+      <span class="back">↺ 循环往复,直到"不再调工具"或步数上限 max_steps</span>
+    </div>
+    <div class="code">
+      <div class="cap"><span>主循环骨架(教学版,刻意一眼看完)</span><span class="lang">Python</span></div>
+<pre><span class="k">for</span> step <span class="k">in</span> <span class="f">range</span>(<span class="n">1</span>, max_steps + <span class="n">1</span>):
+    message = llm.<span class="f">chat</span>(history, tools=schema)   <span class="c"># Reason:决定要不要调工具</span>
+    <span class="k">if not</span> message.tool_calls:                  <span class="c"># 不再行动 → 尝试收尾</span>
+        <span class="k">return</span> message.content
+    <span class="k">for</span> call <span class="k">in</span> message.tool_calls:             <span class="c"># Act:编译/计时/画像/晋升…</span>
+        observation = executor.<span class="f">call</span>(...)         <span class="c"># 工具回传结构化观察</span>
+        history.<span class="f">append</span>(observation)              <span class="c"># 观察回灌,进入下一轮</span></pre>
+    </div>
+    <div class="callout analogy">
+      <div class="tt">🗣️ 白话:指挥官与侦察兵</div>
+      LLM 是只动嘴的<b>指挥官</b>;工具是执行并回传实测数据的<b>侦察兵</b>;循环是<b>作战例会</b>——每轮看侦察报告再下指令,而不是听指挥官拍脑袋宣布"我军大胜"。
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>⚖️ 权威工具 vs 自由工具:法庭只认证物</h3>
+    <div class="grid2">
+      <div class="callout ok">
+        <div class="tt">🏛️ 权威工具(结果即事实)</div>
+        <code class="inline">compile_kernel</code> · <code class="inline">bench_kernel</code> · <code class="inline">profile_kernel</code> · <code class="inline">accept_candidate</code> · <code class="inline">measure_peak</code>。<b>性能数字只认它们</b>,晋升由 <code class="inline">accept_candidate</code> 单独完成。
+      </div>
+      <div class="callout plain">
+        <div class="tt">💬 自由工具(允许发挥)</div>
+        <code class="inline">ask_user</code> · <code class="inline">convert_kernel</code> · <code class="inline">run_code</code> · <code class="inline">read_reference</code>。可以出主意、查资料,但它们的"自测加速比"<b>不许写进报告</b>。
+      </div>
+    </div>
+    <div class="callout acc">
+      <div class="tt">🎯 为什么算子优化特别适合 Agent?</div>
+      三个"Agent 友好"特征,恰好对应闭环的三个环:<b>目标可量化</b>(延迟中位数、配对改进比例、距峰值空间)、<b>行动可封装</b>(五个标准工具)、<b>反馈可验证</b>(PyTorch reference 当标准答案 + warmup/GPU event/中位数计时)。一句话:有标准答案、有标准动作、有标准判卷的科目,才好自动化。
+    </div>
+  </div>
+</section>
+
+<!-- ============ CH15 ============ -->
+<section id="ch15">
+  <div class="sec-head"><div class="sec-num">15</div><h2>工具封装:给 Agent 一张格式统一的体检报告单</h2></div>
+  <div class="sec-sub">把人类的计时习惯、正确性检查和 profiling 直觉,收编成 Agent 可调用、返回可解析的标准化工具。</div>
+
+  <div class="card">
+    <h3>🧰 工具三件套 + 唯一晋升入口</h3>
+    <table>
+      <tr><th>工具</th><th>回答什么问题</th><th>返回什么(节选)</th><th>白话</th></tr>
+      <tr><td><code class="inline">compile_kernel</code></td><td>能不能编译?</td><td class="num"><code class="inline">{"ok":false,"stage":"compile","errors":[{"line":42,"msg":"expected a type"}]}</code></td><td>错误<b>按行列出</b>,不是泼一盆日志</td></tr>
+      <tr><td><code class="inline">bench_kernel</code></td><td>有多快?</td><td class="num">median 0.322 ms · p95 0.340 · 带宽 156.2 GB/s</td><td>秒表:只报成绩,不判名次</td></tr>
+      <tr><td><code class="inline">profile_kernel</code></td><td>慢在哪?</td><td class="num">bottleneck "DRAM bandwidth" · memory-bound · AI 0.167</td><td>要瓶颈信号,不要几千行 trace</td></tr>
+      <tr><td><code class="inline">measure_peak</code></td><td>极限在哪?</td><td class="num">带宽 210.5 GB/s · fp16 27.8 TFLOPS(实测缓存)</td><td>量"这条路的限高架",禁止写死型号常数</td></tr>
+      <tr><td><code class="inline">accept_candidate</code></td><td>能不能晋升?</td><td class="num">{"accepted":true,"improvementFraction":0.0150}</td><td>唯一有钥匙的面试官,<b>落选记录也存档</b></td></tr>
+    </table>
+    <div class="callout analogy">
+      <div class="tt">🗣️ 白话:晋升答辩制</div>
+      候选方案要和现任 incumbent<b>交错配对计时</b>:中位改进 ≥1% 且多数配对为正,才能覆盖 <code class="inline">best.py</code>;无论成败都追加进 <code class="inline">trajectory.jsonl</code> 轨迹。落选者自动离场,擂主不变——<b>回退不是 undo 按钮,是晋升制的副产品</b>。
+    </div>
+    <div class="callout warn">
+      <div class="tt">⚠️ 设计红线</div>
+      <b>①</b> Agent 拼不好 shell 字符串——必须结构化接口。<b>②</b> 错误按行列出,文本模型会被噪音日志淹没。<b>③</b> <b>"工具失败不算任务失败"</b>——结构化错误回灌对话历史,触发反思重试。<b>④</b> 反馈要分层:编译成败、正确性、性能三层信息互相独立,Agent 才知道卡在哪层。
+    </div>
+  </div>
+</section>
+
+<!-- ============ CH16 ============ -->
+<section id="ch16">
+  <div class="sec-head"><div class="sec-num">16</div><h2>算子优化 Agent 设计:六步主循环</h2></div>
+  <div class="sec-sub">流水线工人(工具)按标准检测,设计师(LLM)只能提案,盖章权在质检章。</div>
+
+  <div class="card">
+    <h3>🔄 六步闭环</h3>
+    <div class="loop">
+      <span class="st">① 读题建合同</span><span class="ar">→</span>
+      <span class="st brain">② LLM 生成候选</span><span class="ar">→</span>
+      <span class="st tool">③ compile</span><span class="ar">→</span>
+      <span class="st tool">④ bench</span><span class="ar">→</span>
+      <span class="st tool">⑤ profile</span><span class="ar">→</span>
+      <span class="st judge">⑥ accept?</span>
+      <span class="back">接受 → 更新 best.py | 拒绝 → 读错因、换机制 → 回到 ②;直到收尾 → 中文报告 + 确定性汇总</span>
+    </div>
+    <div class="grid2">
+      <div class="callout plain">
+        <div class="tt">📜 读题 = 签工程合同</div>
+        把规格变成<b>可检查的条件</b>:reference、atol/rtol、入口签名;把性能目标变成<b>可量化的数字</b>:改进阈值或绝对延迟。开工前双方都认账。
+      </div>
+      <div class="callout plain">
+        <div class="tt">🎛️ 一次只改一个机制</div>
+        第一版唯一目标是<b>正确</b>(它是一切比较的基线);之后每轮根据 profile 与优化模式手册,一次改一个主要机制——控制变量法,Agent 也要遵守。
+      </div>
+    </div>
+    <div class="callout acc">
+      <div class="tt">🩺 反思三层次:看化验单三连问</div>
+      <b>现象</b>(数字多少、差目标多少)→ <b>原因</b>(profiling 说什么:访存受限/占用不足/启动开销)→ <b>行动</b>(下一步改什么、预期是什么)。映射到工具反馈:读 <code class="inline">errors[]</code> 修语法;读 <code class="inline">below_threshold</code> 换方向;memory-bound 就减搬运/减启动,compute-bound 就减运算。
+    </div>
+    <div class="callout warn">
+      <div class="tt">⚠️ 本章负结果:R5 的教训</div>
+      Agent 把 <code class="inline">block_size</code> 推到 8192:编译通过、正确性通过,<b>但中位延迟大幅变慢(-17.3%)</b>——过大 block 伤害占用与调度。评测器拒绝后,Agent 回到 4096 路线。<b>会承认方向走不通,是闭环成熟的表现。</b>
+    </div>
+  </div>
+</section>
+
+<!-- ============ CH17 ============ -->
+<section id="ch17">
+  <div class="sec-head"><div class="sec-num">17</div><h2>多轮优化实战:0.705 → 0.322 ms 的完整账本</h2></div>
+  <div class="sec-sub">vector_add 上 10 轮全自动优化:5 次接受、5 次拒绝、一次有价值的失败——证明的是闭环可信,不是极限加速。</div>
+
+  <div class="card">
+    <h3>📋 赛制与赛道</h3>
+    <p>任务:fp16 <b>4096×2048</b>(约 840 万元素)向量加,Triton on ROCm,与 PyTorch reference 比对;硬件 Radeon 8060S。开赛前先量天花板:带宽 <b>210.5 GB/s</b>、fp16 <b>27.8 TFLOPS</b>;profile 显示 AI≈0.167 → <b>memory-bound</b>,所以主攻方向是"更大 block + 更多 warps"(少跑几趟、每车装满)。</p>
+    <div class="rounds">
+      <div class="rrow"><span class="rname">R1</span><div class="rtrack"><div class="rfill" style="width:46%; background:#2f9e44;">0.378 ms</div></div><span class="rdesc">block 256→1024</span><span class="rres ok">接受 +46.3%</span></div>
+      <div class="rrow"><span class="rname">R2</span><div class="rtrack"><div class="rfill" style="width:46%; background:#adb5bd;">0.372 ms</div></div><span class="rdesc">+num_stages=2</span><span class="rres no">拒绝 -0.3%</span></div>
+      <div class="rrow"><span class="rname">R3</span><div class="rtrack"><div class="rfill" style="width:42.5%; background:#adb5bd;">0.342 ms</div></div><span class="rdesc">block→2048</span><span class="rres no">拒绝 -1.0%</span></div>
+      <div class="rrow"><span class="rname">R4</span><div class="rtrack"><div class="rfill" style="width:42%; background:#2f9e44;">0.338 ms</div></div><span class="rdesc">block→4096</span><span class="rres ok">接受 +4.6%</span></div>
+      <div class="rrow"><span class="rname">R5</span><div class="rtrack"><div class="rfill" style="width:51%; background:#e03131;">0.405 ms</div></div><span class="rdesc">block→8192(过大!)</span><span class="rres no">拒绝 -17.3%</span></div>
+      <div class="rrow"><span class="rname">R6</span><div class="rtrack"><div class="rfill" style="width:42.3%; background:#adb5bd;">0.340 ms</div></div><span class="rdesc">4096+num_stages=2</span><span class="rres no">拒绝 +0.3%&lt;1%</span></div>
+      <div class="rrow"><span class="rname">R7</span><div class="rtrack"><div class="rfill" style="width:41%; background:#2f9e44;">0.329 ms</div></div><span class="rdesc">+num_warps=8</span><span class="rres ok">接受 +3.5%</span></div>
+      <div class="rrow"><span class="rname">R8</span><div class="rtrack"><div class="rfill" style="width:40.7%; background:#2f9e44;">0.326 ms</div></div><span class="rdesc">num_warps=16</span><span class="rres ok">接受 +1.2%</span></div>
+      <div class="rrow"><span class="rname">R9</span><div class="rtrack"><div class="rfill" style="width:40.2%; background:#1971c2;">0.322 ms ★</div></div><span class="rdesc">num_warps=32</span><span class="rres ok">接受 +1.5%</span></div>
+      <div class="rrow"><span class="rname">R10</span><div class="rtrack"><div class="rfill" style="width:40.3%; background:#adb5bd;">0.323 ms</div></div><span class="rdesc">+num_stages=2</span><span class="rres no">拒绝 +0.5%&lt;1%</span></div>
+    </div>
+    <p class="muted" style="margin-top:8px;">横条按延迟长短示意(越短越快);基线 0.705 ms 超出画面右侧。最终 best:R9,block_size=4096 + num_warps=32。</p>
+  </div>
+
+  <div class="card">
+    <h3>🧾 怎么读这份账本</h3>
+    <div class="grid2">
+      <div class="callout ok">
+        <div class="tt">📈 成绩与归因</div>
+        <b>0.705 → 0.322 ms ≈ 2.19×(延迟降 54%)</b>。来源全部可追溯:block 256→4096(grid 启动次数约减 16 倍)+ num_warps 提到 32。每一步都是工具账本说了算,不是模型口头宣布。
+      </div>
+      <div class="callout warn">
+        <div class="tt">🚧 诚实边界(不可外推)</div>
+        2.19× 发生在"baseline 故意朴素"的前提下;vector_add 本就近带宽墙。"3-5×"的承诺只针对有真实优化空间的算子(融合 softmax、naive reduction/matmul)。<b>纯 Agent 发明新结构的能力≈0</b>——正确打开方式是"人给关键洞察,Agent 快速验证并留痕"。
+      </div>
+    </div>
+    <div class="callout analogy">
+      <div class="tt">🗣️ 白话:实验记录本</div>
+      工作区固定五件套:任务合同 task.json、参考答案 reference.py、现任擂主 best.py、硬件档案 hardware.json、<b>逐轮账本 trajectory.jsonl</b>。失败页码也装订进册——报告里"事实"与"推测"严格分栏,像论文的数据区与猜想区。
+    </div>
+  </div>
+</section>
+
+<div class="partnav">
+  <a href="part2.html">← 上一部分 · 算子篇</a>
+  <a href="part4.html">下一部分 · 实战篇(第18-19章):真实模型上场 →</a>
+</div>
+
+<footer>
+  <p>内容整理自 <a href="https://github.com/datawhalechina/hello-gpu" target="_blank">datawhalechina/hello-gpu</a> 第 14-17 章 · 白话重述与图解,数据引自原文实测(Radeon 8060S / ROCm 7.12);如有出入以原文为准。</p>
+</footer>
+</div>
+</body>
+</html>
