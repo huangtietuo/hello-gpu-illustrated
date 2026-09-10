@@ -3,6 +3,8 @@
 > 原著:[datawhalechina/hello-gpu](https://github.com/datawhalechina/hello-gpu)(dev 分支,全 20 章)
 > 本仓库:把原著重写成**看得懂的白话 + 画出来的原理 + 敢记录的负结果**,纯静态页面,零依赖,GitHub Pages 直接托管。
 
+**📖 在线阅读：** [https://huangtietuo.github.io/hello-gpu-illustrated/](https://huangtietuo.github.io/hello-gpu-illustrated/)(浏览器直接打开,无需安装,桌面/移动端自适应)
+
 ## ✨ 这是什么
 
 - **20 章全覆盖**,组织为 5 个部分页 + 1 个首页地图 + 1 个交互加强页:
