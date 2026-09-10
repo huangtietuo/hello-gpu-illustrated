@@ -22,27 +22,9 @@
 - 所有数据(耗时、带宽、加速比)引自原文实测(RX 9070 XT / ROCm 7.13 等基线平台),未实测的章节如实标注 Alpha。
 - 本站是**学习辅助材料**,代码与完整推导以[原文](https://github.com/datawhalechina/hello-gpu)为准。
 
-## 🚀 部署到 GitHub Pages(3 步)
+## 🌐 在线访问
 
-1. **创建仓库**:在 GitHub 上新建仓库,推荐名称 **`hello-gpu-illustrated`**(备选:`hello-gpu-viz`、`gpu-baihua`)。不要勾选自动生成 README(本目录已有)。
-
-2. **推送本目录全部文件**:
-
-   ```bash
-   cd 本目录
-   git init
-   git add .
-   git commit -m "Hello GPU 白话图解教材(20章)"
-   git branch -M main
-   git remote add origin https://github.com/<你的用户名>/hello-gpu-illustrated.git
-   git push -u origin main
-   ```
-
-3. **开启 Pages**:仓库 → Settings → Pages → Build and deployment → Source 选 **Deploy from a branch** → Branch 选 **main** / **/(root)** → Save。
-
-一两分钟后访问 `https://<你的用户名>.github.io/hello-gpu-illustrated/` 即可。
-
-> 想绑定自定义域名或用 Actions 部署也可以,纯静态站无需任何构建步骤。
+本站已部署在 GitHub Pages,点击顶部 [在线阅读](https://huangtietuo.github.io/hello-gpu-illustrated/) 即可直接浏览;纯静态页面、零依赖、无需任何构建步骤。
 
 ## 🧭 推荐学习路线
 
